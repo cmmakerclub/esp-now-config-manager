@@ -3,12 +3,17 @@
 #include <CMMC_SimplePair.h>
 #include <CMMC_Config_Manager.h>
 #include "FS.h"
-
+extern "C" {
+#include <espnow.h>
+#include <user_interface.h>
+}
 CMMC_SimplePair instance;
 CMMC_Config_Manager configManager;
 u8 pair_key[16] = {0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
                    0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
                   };
+
+bool ledState = LOW;
 void printMacAddress(uint8_t* macaddr) {
   Serial.print("{");
   for (int i = 0; i < 6; i++) {
@@ -34,12 +39,14 @@ void evt_success(u8* sa, u8 status, const u8* key) {
   char buf[13];
   bzero(buf, 13);
   sprintf(buf, "%02x%02x%02x%02x%02x%02x",
-          sa[0], sa[1], sa[2], sa[3], sa[4], sa[5]);
+          key[0], key[1], key[2], key[3], key[4], key [5]);
   Serial.println(buf);
   configManager.add_field("mac", buf);
 
   configManager.commit();
-
+  digitalWrite(LED_BUILTIN, HIGH);
+  delay(1000);
+  ESP.reset();
 }
 
 void evt_error(u8* sa, u8 status, const char* cause) {
@@ -47,14 +54,18 @@ void evt_error(u8* sa, u8 status, const char* cause) {
 }
 
 uint8_t master_mac[6];
-
+#define BUTTON_PIN 13
 void setup()
 {
   Serial.begin(115200);
+  Serial.flush();
+  WiFi.disconnect(0);
+  pinMode(LED_BUILTIN, OUTPUT);
+  pinMode(BUTTON_PIN, INPUT_PULLUP);
+  delay(1000);
+
   SPIFFS.begin();
-  configManager.init("/config.json");
-
-
+  configManager.init("/config2.json");
   configManager.load_config([](JsonObject * root) {
     Serial.println("[user] json loaded..");
     if (root->containsKey("mac")) {
@@ -70,13 +81,49 @@ void setup()
       Serial.println();
     }
   });
+  if (digitalRead(BUTTON_PIN) == 0) {
+    WiFi.disconnect(0);
+    delay(100);
+    WiFi.mode(WIFI_STA);
+    delay(100);
+    instance.begin(SLAVE_MODE, pair_key, NULL, evt_success, evt_error);
+    instance.add_debug_listener([](const char* s) {
+      Serial.printf("[USER]: %s\r\n", s);
+    });
+    instance.start();
+  } else { // espnow
+    WiFi.disconnect(0);
+    delay(100);
+    WiFi.mode(WIFI_STA);
+    delay(100);
+    Serial.println("====================");
+    Serial.println("   MODE = ESPNOW    ");
+    Serial.println("====================");
+    WiFi.disconnect();
+    Serial.println("Initializing ESPNOW...");
+    Serial.println("Initializing... SLAVE");
 
-  instance.begin(SLAVE_MODE, pair_key, NULL, evt_success, evt_error);
-  instance.add_debug_listener([](const char* s) {
-    Serial.printf("[USER]: %s\r\n", s);
-  });
-  instance.start();
+    if (esp_now_init() == 0) {
+      Serial.println("init");
+    } else {
+      Serial.println("init failed");
+      ESP.restart();
+      return;
+    }
+    esp_now_set_self_role(ESP_NOW_ROLE_SLAVE);
+    esp_now_register_send_cb([](uint8_t* macaddr, uint8_t status) {
+      Serial.printf("sent status => [%lu]\r\n", status);
+      printMacAddress(macaddr);
+    });
 
+    while (1) {
+      u8 packet[5];
+      esp_now_send(master_mac, (u8*) &packet, sizeof(packet));
+      digitalWrite(LED_BUILTIN, ledState);
+      ledState = !ledState;
+      delay(1000);
+    }
+  }
 }
 
 void loop()
