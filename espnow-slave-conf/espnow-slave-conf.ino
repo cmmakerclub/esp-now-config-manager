@@ -9,9 +9,10 @@ extern "C" {
 }
 CMMC_SimplePair instance;
 CMMC_Config_Manager configManager;
-u8 pair_key[16] = {0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                   0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
-                  };
+uint8_t master_mac[6];
+
+#define LED LED_BUILTIN
+#define BUTTON_PIN 13
 
 bool ledState = LOW;
 void printMacAddress(uint8_t* macaddr) {
@@ -32,29 +33,26 @@ void dump(const u8* data, size_t size) {
   Serial.println();
 }
 
-void evt_success(u8* sa, u8 status, const u8* key) {
-  Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
-  Serial.printf("WITH KEY: "); dump(key, 16);
-  Serial.printf("WITH MAC: "); dump(sa, 6);
-  char buf[13];
-  bzero(buf, 13);
-  sprintf(buf, "%02x%02x%02x%02x%02x%02x",
-          key[0], key[1], key[2], key[3], key[4], key [5]);
-  Serial.println(buf);
-  configManager.add_field("mac", buf);
+void evt_callback(u8 status, u8* sa, const u8* data) {
+  if (status == 0) {
+    Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
+    Serial.printf("WITH KEY: "); dump(data, 16);
+    Serial.printf("WITH MAC: "); dump(sa, 6);
+    char buf[13];
+    bzero(buf, 13);
+    sprintf(buf, "%02x%02x%02x%02x%02x%02x", data[0], data[1], data[2], data[3], data[4], data[5]);
+    Serial.println(buf);
+    configManager.add_field("mac", buf);
 
-  configManager.commit();
-  digitalWrite(LED_BUILTIN, HIGH);
-  delay(1000);
-  ESP.reset();
+    configManager.commit();
+    digitalWrite(LED, HIGH);
+    ESP.reset();
+  }
+  else {
+    Serial.printf("[CSP_EVENT_ERROR] %d: %s\r\n", status, (const char*)data);
+  }
 }
 
-void evt_error(u8* sa, u8 status, const char* cause) {
-  Serial.printf("[CSP_EVENT_ERROR] %d: %s\r\n", status, cause);
-}
-
-uint8_t master_mac[6];
-#define BUTTON_PIN 13
 void setup()
 {
   Serial.begin(115200);
@@ -81,19 +79,16 @@ void setup()
       Serial.println();
     }
   });
+
   if (digitalRead(BUTTON_PIN) == 0) {
-    WiFi.disconnect(0);
-    delay(100);
-    WiFi.mode(WIFI_STA);
-    delay(100);
-    instance.begin(SLAVE_MODE, pair_key, NULL, evt_success, evt_error);
-    instance.add_debug_listener([](const char* s) {
+    instance.begin(SLAVE_MODE, evt_callback);
+    instance.debug([](const char* s) {
       Serial.printf("[USER]: %s\r\n", s);
     });
+//    instance.set_pair_key(0x01);
     instance.start();
   } else { // espnow
     WiFi.disconnect(0);
-    delay(100);
     WiFi.mode(WIFI_STA);
     delay(100);
     Serial.println("====================");

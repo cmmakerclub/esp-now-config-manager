@@ -6,8 +6,11 @@ extern "C" {
 #include <user_interface.h>
 }
 
+#define LED LED_BUILTIN
+
 CMMC_SimplePair instance;
 bool ledState = LOW;
+
 
 void dump(const u8* data, size_t size) {
   for (size_t i = 0; i < size - 1; i++) {
@@ -17,24 +20,18 @@ void dump(const u8* data, size_t size) {
   Serial.println();
 }
 
-void evt_success(u8* sa, u8 status, const u8* key) {
-  Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
-  Serial.printf("WITH KEY: "); dump(key, 16);
-  Serial.printf("WITH MAC: "); dump(sa, 6);
-  digitalWrite(LED_BUILTIN, HIGH);
-  ESP.reset();
+void evt_callback(u8 status, u8* sa, const u8* data) {
+  if (status == 0) {
+    Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
+    Serial.printf("WITH KEY: "); dump(data, 16);
+    Serial.printf("WITH MAC: "); dump(sa, 6);
+    digitalWrite(LED, HIGH);
+    ESP.reset();
+  }
+  else {
+    Serial.printf("[CSP_EVENT_ERROR] %d: %s\r\n", status, (const char*)data);
+  }
 }
-
-void evt_error(u8* sa, u8 status, const char* cause) {
-  Serial.printf("[CSP_EVENT_ERROR] %d: %s\r\n", status, cause);
-}
-
-u8 pair_key[16] = {0x09, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07,
-                   0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f
-                  };
-u8 message[16] = {0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0x01,
-                  0x01, 0x01, 0x01, 0x01, 0x01, 0x01, 0xff, 0xfa
-                 };
 
 #define BUTTON_PIN 13
 void setup()
@@ -42,62 +39,37 @@ void setup()
   Serial.begin(115200);
   Serial.flush();
 
-  pinMode(LED_BUILTIN, OUTPUT); 
-  digitalWrite(LED_BUILTIN, HIGH);
+  pinMode(LED, OUTPUT);
+  digitalWrite(LED, HIGH);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   delay(1000);
 
   if (digitalRead(BUTTON_PIN) == 0) {
-    digitalWrite(LED_BUILTIN, LOW);
-    WiFi.disconnect(0);
-    delay(100);
-    WiFi.mode(WIFI_AP);
-    WiFi.softAP("hello nazt");
-
-    wifi_get_macaddr(STATION_IF, message);
-    instance.begin(MASTER_MODE, pair_key, message, evt_success, evt_error);
-    instance.add_debug_listener([](const char* s) {
-      Serial.printf("[USER]: %s\r\n", s);
-    });
+    digitalWrite(LED, LOW);
+    instance.begin(MASTER_MODE, evt_callback);
     instance.start();
   }
   else {
-    Serial.print("Initializing... Controller..");
-    WiFi.disconnect(0);
-    delay(100);
+    WiFi.disconnect();
     WiFi.mode(WIFI_STA);
-    uint8_t macaddr[6];
-
-    wifi_get_macaddr(STATION_IF, macaddr);
-    Serial.print("[master] address (STATION_IF): ");
-    printMacAddress(macaddr);
-    Serial.println();
-
-    wifi_get_macaddr(SOFTAP_IF, macaddr);
-    Serial.print("[slave] address (SOFTAP_IF): ");
-    printMacAddress(macaddr);
-    Serial.println();
-
-
+    Serial.print("Initializing... Controller..");
     if (esp_now_init() == 0) {
       Serial.print("direct link  init ok");
     } else {
       Serial.print("dl init failed");
       ESP.restart();
       return;
-    }
+    } 
 
     esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
     esp_now_register_recv_cb([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-      //      freqCounter++;
       //      if (digitalRead(BUTTON_PIN) == HIGH) {
       // PACKET_T pkt;
       // memcpy(&pkt, data, sizeof(pkt));
       // memcpy(&pkt.from, macaddr, 48);
       // SENSOR_T sensorData = pkt.data;
       Serial.write(data, len);
-      //}
-      digitalWrite(LED_BUILTIN, ledState);
+      digitalWrite(LED, ledState);
       ledState = !ledState;
 
     });
