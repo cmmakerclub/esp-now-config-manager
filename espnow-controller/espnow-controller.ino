@@ -2,6 +2,7 @@
 #include <ESP8266WiFi.h>
 #include <CMMC_SimplePair.h>
 #include <CMMC_Utils.h>
+#include <CMMC_ESPNow.h>
 extern "C" {
 #include <espnow.h>
 #include <user_interface.h>
@@ -11,9 +12,10 @@ extern "C" {
 #define BUTTON_PIN 13
 
 CMMC_SimplePair instance;
+CMMC_ESPNow ESPNow;
 CMMC_Utils utils;
-bool ledState = LOW;
 
+bool ledState = LOW;
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -50,16 +52,8 @@ void check_boot_mode() {
     WiFi.mode(WIFI_STA);
     delay(50);
     Serial.print("Initializing... Controller..");
-    if (esp_now_init() == 0) {
-      Serial.print("direct link  init ok");
-    } else {
-      Serial.print("dl init failed");
-      ESP.restart();
-      return;
-    }
-    esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
-    esp_now_register_recv_cb([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-      //      if (digitalRead(BUTTON_PIN) == HIGH) {
+    ESPNow.init(NOW_MODE_CONTROLLER);
+    ESPNow.on_message([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
       // PACKET_T pkt;
       // memcpy(&pkt, data, sizeof(pkt));
       // memcpy(&pkt.from, macaddr, 48);

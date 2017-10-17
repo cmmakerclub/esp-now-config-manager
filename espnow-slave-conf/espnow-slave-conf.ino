@@ -1,9 +1,12 @@
 #include <Arduino.h>
+#include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
 #include <CMMC_Utils.h>
 #include <CMMC_SimplePair.h>
 #include <CMMC_Config_Manager.h>
 #include <CMMC_ESPNow.h>
+#include <CMMC_BootMode.h>
+#include <CMMC_LED.h>
 #include "FS.h"
 
 extern "C" {
@@ -11,17 +14,18 @@ extern "C" {
 #include <user_interface.h>
 }
 
-CMMC_Utils utils;
-CMMC_SimplePair instance;
-CMMC_Config_Manager configManager;
-CMMC_ESPNow ESPNow;
-
-uint8_t master_mac[6];
-
 #define LED LED_BUILTIN
 #define BUTTON_PIN 13
 
-bool ledState = LOW;
+uint8_t master_mac[6];
+int mode;
+
+CMMC_Utils utils;
+CMMC_SimplePair instance;
+CMMC_Config_Manager configManager;
+CMMC_ESPNow espNow;
+CMMC_LED led(LED, HIGH);
+CMMC_BootMode bootMode(&mode, BUTTON_PIN);
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -49,7 +53,7 @@ void setup_hardware() {
   Serial.begin(115200);
   Serial.flush();
   WiFi.disconnect(0);
-  pinMode(LED_BUILTIN, OUTPUT);
+  led.init();
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   delay(1000);
 }
@@ -69,34 +73,36 @@ void load_config() {
   });
 }
 
-void check_boot_mode() {
-  if (digitalRead(BUTTON_PIN) == 0) {
-    instance.begin(SLAVE_MODE, evt_callback);
-    instance.debug([](const char* s) {
-      Serial.printf("[USER]: %s\r\n", s);
-    });
-    instance.start();
-  } else {
-    // espnow
-    ESPNow.init(NOW_MODE_SLAVE);
-    u8 packet[5];
-    while (1) {
-      ESPNow.send(master_mac, packet, sizeof packet);
-      digitalWrite(LED_BUILTIN, ledState);
-      ledState = !ledState;
-      delay(1000);
-    }
-  }
+void start_config_mode() {
+  instance.begin(SLAVE_MODE, evt_callback);
+  instance.debug([](const char* s) {
+    Serial.printf("[USER]: %s\r\n", s);
+  });
+  instance.start();
 }
 
 void setup()
 {
   setup_hardware();
   load_config();
-  check_boot_mode();
+  bootMode.check([](int mode) {
+    if (mode == BootMode::MODE_CONFIG) {
+      start_config_mode();
+    }
+    else if (mode == BootMode::MODE_RUN) {
+      espNow.init(NOW_MODE_SLAVE);
+    }
+    else {
+      // unhandled
+    }
+  });
 }
+
+u8 packet[5];
 
 void loop()
 {
-
+  espNow.send(master_mac, packet, sizeof packet);
+  led.toggle();
+  delay(1000);
 }
