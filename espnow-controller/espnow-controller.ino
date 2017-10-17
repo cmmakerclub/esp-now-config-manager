@@ -8,16 +8,20 @@ extern "C" {
 }
 
 #define LED LED_BUILTIN
+#define BUTTON_PIN 13
 
 CMMC_SimplePair instance;
 CMMC_Utils utils;
 bool ledState = LOW;
 
+
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
     Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
-    Serial.printf("WITH KEY: "); dump(data, 16);
-    Serial.printf("WITH MAC: "); dump(sa, 6);
+    Serial.printf("WITH KEY: ");
+    utils.dump(data, 16);
+    Serial.printf("WITH MAC: ");
+    utils.dump(sa, 6);
     digitalWrite(LED, HIGH);
     ESP.reset();
   }
@@ -25,10 +29,7 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
     Serial.printf("[CSP_EVENT_ERROR] %d: %s\r\n", status, (const char*)data);
   }
 }
-
-#define BUTTON_PIN 13
-void setup()
-{
+void setup_hardware() {
   Serial.begin(115200);
   Serial.flush();
 
@@ -37,6 +38,8 @@ void setup()
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   delay(1000);
 
+}
+void check_boot_mode() {
   if (digitalRead(BUTTON_PIN) == 0) {
     digitalWrite(LED, LOW);
     instance.begin(MASTER_MODE, evt_callback);
@@ -45,6 +48,7 @@ void setup()
   else {
     WiFi.disconnect();
     WiFi.mode(WIFI_STA);
+    delay(50);
     Serial.print("Initializing... Controller..");
     if (esp_now_init() == 0) {
       Serial.print("direct link  init ok");
@@ -52,8 +56,7 @@ void setup()
       Serial.print("dl init failed");
       ESP.restart();
       return;
-    } 
-
+    }
     esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
     esp_now_register_recv_cb([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
       //      if (digitalRead(BUTTON_PIN) == HIGH) {
@@ -66,7 +69,12 @@ void setup()
       ledState = !ledState;
     });
   }
+}
 
+void setup()
+{
+  setup_hardware();
+  check_boot_mode();
 }
 
 void loop()

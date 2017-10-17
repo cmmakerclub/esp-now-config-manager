@@ -5,6 +5,7 @@
 #include <CMMC_Config_Manager.h>
 #include <CMMC_ESPNow.h>
 #include "FS.h"
+
 extern "C" {
 #include <espnow.h>
 #include <user_interface.h>
@@ -44,15 +45,16 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
   }
 }
 
-void setup()
-{
+void setup_hardware() {
   Serial.begin(115200);
   Serial.flush();
   WiFi.disconnect(0);
   pinMode(LED_BUILTIN, OUTPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
   delay(1000);
+}
 
+void load_config() {
   SPIFFS.begin();
   configManager.init("/config2.json");
   configManager.load_config([](JsonObject * root) {
@@ -65,14 +67,16 @@ void setup()
       Serial.println();
     }
   });
+}
 
+void check_boot_mode() {
   if (digitalRead(BUTTON_PIN) == 0) {
     instance.begin(SLAVE_MODE, evt_callback);
     instance.debug([](const char* s) {
       Serial.printf("[USER]: %s\r\n", s);
     });
     instance.start();
-  } else { 
+  } else {
     // espnow
     ESPNow.init(NOW_MODE_SLAVE);
     u8 packet[5];
@@ -83,6 +87,13 @@ void setup()
       delay(1000);
     }
   }
+}
+
+void setup()
+{
+  setup_hardware();
+  load_config();
+  check_boot_mode();
 }
 
 void loop()
