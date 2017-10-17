@@ -64,8 +64,6 @@ void setup()
   Serial.println();
   bootMode.init();
   bootMode.check([](int mode) {
-    Serial.print("MMMODE: ");
-    Serial.println(mode);
     if (mode == BootMode::MODE_CONFIG) {
       led.low();
       start_config_mode();
@@ -74,14 +72,8 @@ void setup()
       Serial.print("Initializing... Controller..");
       espNow.init(NOW_MODE_CONTROLLER);
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-        utils.dump(data, len);
-        // Serial.println("ON MESSAGE");
-        // PACKET_T pkt;
-        // memcpy(&pkt, data, sizeof(pkt));
-        // memcpy(&pkt.from, macaddr, 48);
-        // SENSOR_T sensorData = pkt.data;
-        //        Serial.write(data, len);
-        led.toggle();
+        Serial.printf("%lu: len = %lu, data %lu \r\n", millis(), len, data[0]);
+        led.set(data[0]);
       });
     }
     else {
