@@ -36,9 +36,9 @@ DHT dht = DHT(DHTPIN, dhtType);
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
     char buf[13];
-    Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
-    Serial.printf("WITH KEY: "); utils.dump(data, 16);
-    Serial.printf("WITH MAC: "); utils.dump(sa, 6);
+    //    Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
+    //    Serial.printf("WITH KEY: "); utils.dump(data, 16);
+    //    Serial.printf("WITH MAC: "); utils.dump(sa, 6);
     utils.macByteToString(data, buf);
     configManager.add_field("mac", buf);
     configManager.commit();
@@ -59,9 +59,7 @@ void load_config() {
     Serial.println("[user] json loaded..");
     if (root->containsKey("mac")) {
       String macStr = String((*root)["mac"].as<const char*>());
-
       Serial.printf("Loaded mac %s\r\n", macStr.c_str());
-
       utils.convertMacStringToUint8(macStr.c_str(), master_mac);
       utils.printMacAddress(master_mac);
       Serial.println();
@@ -72,8 +70,8 @@ void init_espnow() {
   espNow.init(NOW_MODE_SLAVE);
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
-    utils.printMacAddress(macaddr);
-    Serial.printf("status %lu\r\n", status);
+    //utils.printMacAddress(macaddr);
+    //Serial.printf("status %lu\r\n", status);
   });
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
     if (data[0] == 0)
@@ -84,6 +82,9 @@ void init_espnow() {
 void init_simple_pair() {
   simplePair.begin(SLAVE_MODE, evt_callback);
   simplePair.start();
+  while (1) {
+    yield();
+  }
 }
 void setup()
 {
@@ -105,10 +106,11 @@ void setup()
     else {
       // unhandled
     }
-  });
+  }, 500);
 }
 
 CMMC_SENSOR_T sensor_data;
+
 void read_sensor() {
   sensor_data.battery = analogRead(A0);
   float h = dht.readHumidity();
@@ -138,7 +140,7 @@ void loop()
 
   while (true) {
     Serial.println("Waiting a command message...");
-    if (millis() > (dataHasBeenSentAtMillis + 500)) {
+    if (millis() > (dataHasBeenSentAtMillis + 200)) {
       Serial.println("TIMEOUT!!!!");
       Serial.println("go to bed!");
       Serial.println("....BYE");
