@@ -74,11 +74,7 @@ void load_config() {
 }
 
 void start_config_mode() {
-  instance.begin(SLAVE_MODE, evt_callback);
-  instance.debug([](const char* s) {
-    Serial.printf("[USER]: %s\r\n", s);
-  });
-  instance.start();
+
 }
 
 void setup()
@@ -87,10 +83,15 @@ void setup()
   load_config();
   bootMode.check([](int mode) {
     if (mode == BootMode::MODE_CONFIG) {
-      start_config_mode();
+      instance.begin(SLAVE_MODE, evt_callback);
+      instance.start();
     }
     else if (mode == BootMode::MODE_RUN) {
       espNow.init(NOW_MODE_SLAVE);
+      espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
+        utils.printMacAddress(macaddr);
+        Serial.printf("status %lu\r\n", status);
+      });
     }
     else {
       // unhandled
@@ -98,11 +99,11 @@ void setup()
   });
 }
 
-u8 packet[5];
+u8 packet[5] = {0x01, 0x02, 0x03, 0x04, 0x05};
 
 void loop()
 {
-  espNow.send(master_mac, packet, sizeof packet);
+  espNow.send(master_mac, packet, 5);
   led.toggle();
   delay(1000);
 }
