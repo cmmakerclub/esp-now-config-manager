@@ -20,13 +20,13 @@ extern "C" {
 #define LED 2
 #define BUTTON_PIN  0
 #define DHTPIN      12
-
+#define DEFAULT_DEEP_SLEEP_S 30
 uint8_t master_mac[6];
 int dhtType = 22;
 int mode;
 
 CMMC_Utils utils;
-CMMC_SimplePair instance;
+CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
 CMMC_LED led(LED, HIGH);
@@ -51,18 +51,6 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
   }
 }
 
-void setup_hardware() {
-  Serial.begin(115200);
-  Serial.flush();
-  WiFi.disconnect(0);
-
-  // Initialize device.
-  dht.begin();
-
-  led.init();
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  delay(1000);
-}
 
 void load_config() {
   SPIFFS.begin();
@@ -80,30 +68,39 @@ void load_config() {
     }
   });
 }
-
-void start_config_mode() {
-
+void init_espnow() {
+  espNow.init(NOW_MODE_SLAVE);
+  espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
+    led.toggle();
+    utils.printMacAddress(macaddr);
+    Serial.printf("status %lu\r\n", status);
+  });
+  espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
+    if (data[0] == 0)
+      goSleep(30);
+    goSleep(data[0]);
+  });
 }
-
+void init_simple_pair() {
+  simplePair.begin(SLAVE_MODE, evt_callback);
+  simplePair.start();
+}
 void setup()
 {
-  setup_hardware();
-  load_config();
+  Serial.begin(115200);
+  Serial.flush();
+  Serial.println();
+  dht.begin();
+  led.init();
+  bootMode.init();
   bootMode.check([](int mode) {
+    Serial.println(mode);
     if (mode == BootMode::MODE_CONFIG) {
-      instance.begin(SLAVE_MODE, evt_callback);
-      instance.start();
+      init_simple_pair();
     }
     else if (mode == BootMode::MODE_RUN) {
-      espNow.init(NOW_MODE_SLAVE);
-      espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
-        led.toggle();
-        utils.printMacAddress(macaddr);
-        Serial.printf("status %lu\r\n", status);
-        if (status == 0) {
-          goSleep(10);
-        }
-      });
+      load_config();
+      init_espnow();
     }
     else {
       // unhandled
@@ -112,8 +109,7 @@ void setup()
 }
 
 CMMC_SENSOR_T sensor_data;
-void loop()
-{
+void read_sensor() {
   sensor_data.battery = analogRead(A0);
   float h = dht.readHumidity();
   // Read temperature as Celsius (the default)
@@ -132,11 +128,24 @@ void loop()
   Serial.printf("%lu - %02x\r\n", sensor_data.battery, sensor_data.battery);
   Serial.printf("%lu - %02x\r\n", sensor_data.temperature, sensor_data.temperature);
   Serial.printf("%lu - %02x\r\n", sensor_data.humidity, sensor_data.humidity);
-
+}
+void loop()
+{
+  read_sensor();
+  uint32_t dataHasBeenSentAtMillis = millis();
   espNow.send(master_mac, (u8*)&sensor_data, sizeof (sensor_data));
   utils.dump((u8*)&sensor_data, sizeof (sensor_data));
-  delay(1000);
-  goSleep(10);
+
+  while (true) {
+    Serial.println("Waiting a command message...");
+    if (millis() > (dataHasBeenSentAtMillis + 500)) {
+      Serial.println("TIMEOUT!!!!");
+      Serial.println("go to bed!");
+      Serial.println("....BYE");
+      goSleep(DEFAULT_DEEP_SLEEP_S);
+    }
+    delay(100);
+  }
 }
 
 void goSleep(uint32_t deepSleepS) {
