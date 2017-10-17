@@ -7,8 +7,8 @@
 #include <CMMC_BootMode.h>
 
 extern "C" {
-#include <espnow.h>
-#include <user_interface.h>
+  #include <espnow.h>
+  #include <user_interface.h>
 }
 
 #define LED LED_BUILTIN
@@ -55,19 +55,16 @@ void check_boot_mode() {
     instance.start();
   }
   else {
-    WiFi.disconnect();
-    WiFi.mode(WIFI_STA);
-    delay(50);
     Serial.print("Initializing... Controller..");
     espNow.init(NOW_MODE_CONTROLLER);
-//    espNow.on_message([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-//      // PACKET_T pkt;
-//      // memcpy(&pkt, data, sizeof(pkt));
-//      // memcpy(&pkt.from, macaddr, 48);
-//      // SENSOR_T sensorData = pkt.data;
-//      Serial.write(data, len);
-//      led.toggle();
-//    });
+    espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
+      // PACKET_T pkt;
+      // memcpy(&pkt, data, sizeof(pkt));
+      // memcpy(&pkt.from, macaddr, 48);
+      // SENSOR_T sensorData = pkt.data;
+      Serial.write(data, len);
+      led.toggle();
+    });
   }
 }
 
