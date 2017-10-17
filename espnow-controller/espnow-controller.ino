@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <CMMC_SimplePair.h>
+#include <CMMC_Utils.h>
 extern "C" {
 #include <espnow.h>
 #include <user_interface.h>
@@ -9,16 +10,8 @@ extern "C" {
 #define LED LED_BUILTIN
 
 CMMC_SimplePair instance;
+CMMC_Utils utils;
 bool ledState = LOW;
-
-
-void dump(const u8* data, size_t size) {
-  for (size_t i = 0; i < size - 1; i++) {
-    Serial.printf("%02x ", data[i]);
-  }
-  Serial.printf("%02x", data[size - 1]);
-  Serial.println();
-}
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -71,7 +64,6 @@ void setup()
       Serial.write(data, len);
       digitalWrite(LED, ledState);
       ledState = !ledState;
-
     });
   }
 
@@ -80,14 +72,4 @@ void setup()
 void loop()
 {
 
-}
-
-void printMacAddress(uint8_t* macaddr) {
-  Serial.print("{");
-  for (int i = 0; i < 6; i++) {
-    Serial.print("0x");
-    Serial.print(macaddr[i], HEX);
-    if (i < 5) Serial.print(',');
-  }
-  Serial.println("};");
 }
