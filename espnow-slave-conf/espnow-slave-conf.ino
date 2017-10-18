@@ -21,11 +21,13 @@ extern "C" {
 #define BUTTON_PIN  0
 #define DHTPIN      12
 #define DEFAULT_DEEP_SLEEP_S 30
+
+
 uint8_t master_mac[6];
+uint8_t self_mac[6];
 int dhtType = 22;
 int mode;
 
-CMMC_Utils utils;
 CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
@@ -37,16 +39,16 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
     char buf[13];
     Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
-    Serial.printf("WITH KEY: "); utils.dump(data, 16);
-    Serial.printf("WITH MAC: "); utils.dump(sa, 6);
-    utils.macByteToString(data, buf);
-    utils.printMacAddress((uint8_t*)buf);
-    configManager.add_debug_listener([](const char* msg) {
-      Serial.println(msg);
-    });
+    Serial.printf("WITH KEY: ");
+    CMMC::dump(data, 16);
+    Serial.printf("WITH MAC: ");
+    CMMC::dump(sa, 6);
+    CMMC::macByteToString(data, buf);
+    CMMC::printMacAddress((uint8_t*)buf);
     configManager.add_field("mac", buf);
     configManager.commit();
     led.high();
+    delay(1000);
     ESP.reset();
   }
   else {
@@ -61,17 +63,19 @@ void load_config() {
     if (root->containsKey("mac")) {
       String macStr = String((*root)["mac"].as<const char*>());
       Serial.printf("Loaded mac %s\r\n", macStr.c_str());
-      utils.convertMacStringToUint8(macStr.c_str(), master_mac);
-      utils.printMacAddress(master_mac);
+      CMMC::convertMacStringToUint8(macStr.c_str(), master_mac);
+      CMMC::printMacAddress(master_mac);
       Serial.println();
     }
   });
 }
 void init_espnow() {
+  uint8_t* slave_addr = CMMC::getESPNowSlaveMacAddress();
+  memcpy(self_mac, slave_addr, 6);
   espNow.init(NOW_MODE_SLAVE);
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
-    utils.printMacAddress(macaddr);
+    CMMC::printMacAddress(macaddr);
     Serial.printf("status %lu\r\n", status);
   });
 
@@ -95,8 +99,7 @@ void setup()
   Serial.println();
   dht.begin();
   led.init();
-  SPIFFS.begin();
-  configManager.init("/config2.json");
+  configManager.init("/config98.json");
   bootMode.init();
   bootMode.check([](int mode) {
     Serial.println(mode);
@@ -113,45 +116,44 @@ void setup()
   }, 500);
 }
 
-CMMC_SENSOR_T sensor_data;
+CMMC_SENSOR_T packet;
 
 void read_sensor() {
-  sensor_data.battery = analogRead(A0);
+  packet.battery = analogRead(A0);
+  memcpy(packet.to, master_mac, 6);
+  memcpy(packet.from, self_mac, 6);
+  CMMC::printMacAddress(master_mac, 1);
+  CMMC::printMacAddress(self_mac, 1);
+
+  packet.sum = CMMC::checksum((uint8_t*) &packet,
+                              sizeof(packet) - sizeof(packet.sum));
+
   float h = dht.readHumidity();
-  // Read temperature as Celsius (the default)
   float t = dht.readTemperature();
-  // Check if any reads failed and exit early (to try again).
   if (isnan(h) || isnan(t)) {
-    Serial.println("Failed to read from DHT sensor!");
     h = 0.0;
     t = 0.0;
+    Serial.println("Failed to read from DHT sensor!");
   } else {
-    sensor_data.temperature = t * 1000;
-    sensor_data.humidity = h * 1000;
+    packet.temperature = t * 1000;
+    packet.humidity = h * 1000;
   }
 
-  sensor_data.ms = millis();
-  Serial.printf("%lu - %02x\r\n", sensor_data.battery, sensor_data.battery);
-  Serial.printf("%lu - %02x\r\n", sensor_data.temperature, sensor_data.temperature);
-  Serial.printf("%lu - %02x\r\n", sensor_data.humidity, sensor_data.humidity);
+  packet.ms = millis();
+  Serial.printf("%lu - %02x\r\n", packet.battery, packet.battery);
+  Serial.printf("%lu - %02x\r\n", packet.temperature, packet.temperature);
+  Serial.printf("%lu - %02x\r\n", packet.humidity, packet.humidity);
 }
 void loop()
 {
   read_sensor();
-  uint32_t dataHasBeenSentAtMillis = millis();
-  espNow.send(master_mac, (u8*)&sensor_data, sizeof (sensor_data));
-  utils.dump((u8*)&sensor_data, sizeof (sensor_data));
+  auto timeout_cb = []() {
+    Serial.println("TIMEOUT...");
+    goSleep(DEFAULT_DEEP_SLEEP_S);
+  };
+  CMMC::dump((u8*)&packet, sizeof (packet));
+  espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 200);
 
-  while (true) {
-    Serial.println("Waiting a command message...");
-    if (millis() > (dataHasBeenSentAtMillis + 500L)) {
-      Serial.println("TIMEOUT!!!!");
-      Serial.println("go to bed!");
-      Serial.println("....BYE");
-      goSleep(DEFAULT_DEEP_SLEEP_S);
-    }
-    delay(100);
-  }
 }
 
 void goSleep(uint32_t deepSleepS) {
