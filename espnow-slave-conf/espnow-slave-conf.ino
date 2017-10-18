@@ -17,7 +17,7 @@ extern "C" {
 #include <user_interface.h>
 }
 
-#define LED 2
+#define LED_PIN 2
 #define BUTTON_PIN  0
 #define DHTPIN      12
 #define DEFAULT_DEEP_SLEEP_S 30
@@ -29,21 +29,24 @@ CMMC_Utils utils;
 CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
-CMMC_LED led(LED, HIGH);
+CMMC_LED led(LED_PIN, HIGH);
 CMMC_BootMode bootMode(&mode, BUTTON_PIN);
 DHT dht = DHT(DHTPIN, dhtType);
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
     char buf[13];
-    //    Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
-    //    Serial.printf("WITH KEY: "); utils.dump(data, 16);
-    //    Serial.printf("WITH MAC: "); utils.dump(sa, 6);
+    Serial.printf("[CSP_EVENT_SUCCESS] STATUS: %d\r\n", status);
+    Serial.printf("WITH KEY: "); utils.dump(data, 16);
+    Serial.printf("WITH MAC: "); utils.dump(sa, 6);
     utils.macByteToString(data, buf);
+    utils.printMacAddress((uint8_t*)buf);
+    configManager.add_debug_listener([](const char* msg) {
+      Serial.println(msg);
+    });
     configManager.add_field("mac", buf);
     configManager.commit();
-
-    digitalWrite(LED, HIGH);
+    led.high();
     ESP.reset();
   }
   else {
@@ -53,8 +56,6 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
 
 
 void load_config() {
-  SPIFFS.begin();
-  configManager.init("/config2.json");
   configManager.load_config([](JsonObject * root) {
     Serial.println("[user] json loaded..");
     if (root->containsKey("mac")) {
@@ -70,12 +71,13 @@ void init_espnow() {
   espNow.init(NOW_MODE_SLAVE);
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
-    //utils.printMacAddress(macaddr);
-    //Serial.printf("status %lu\r\n", status);
+    utils.printMacAddress(macaddr);
+    Serial.printf("status %lu\r\n", status);
   });
+
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
-    if (data[0] == 0)
-      goSleep(30);
+    Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
+    if (data[0] == 0) data[0] = 30;
     goSleep(data[0]);
   });
 }
@@ -93,6 +95,8 @@ void setup()
   Serial.println();
   dht.begin();
   led.init();
+  SPIFFS.begin();
+  configManager.init("/config2.json");
   bootMode.init();
   bootMode.check([](int mode) {
     Serial.println(mode);
@@ -140,7 +144,7 @@ void loop()
 
   while (true) {
     Serial.println("Waiting a command message...");
-    if (millis() > (dataHasBeenSentAtMillis + 200)) {
+    if (millis() > (dataHasBeenSentAtMillis + 500L)) {
       Serial.println("TIMEOUT!!!!");
       Serial.println("go to bed!");
       Serial.println("....BYE");

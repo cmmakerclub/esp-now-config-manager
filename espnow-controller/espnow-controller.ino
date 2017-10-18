@@ -5,13 +5,9 @@
 #include <CMMC_ESPNow.h>
 #include <CMMC_LED.h>
 #include <CMMC_BootMode.h>
+#include "data_type.h"
 
-extern "C" {
-#include <espnow.h>
-#include <user_interface.h>
-}
-
-#define LED 2
+#define LED_PIN 2
 #define BUTTON_PIN 0
 
 int mode;
@@ -19,7 +15,7 @@ int mode;
 CMMC_SimplePair instance;
 CMMC_ESPNow espNow;
 CMMC_Utils utils;
-CMMC_LED led(LED, HIGH);
+CMMC_LED led(LED_PIN, HIGH);
 CMMC_BootMode bootMode(&mode, BUTTON_PIN);
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
@@ -39,12 +35,7 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
 void setup_hardware() {
   Serial.begin(115200);
   Serial.flush();
-
-  pinMode(LED, OUTPUT);
-  digitalWrite(LED, HIGH);
-  pinMode(BUTTON_PIN, INPUT_PULLUP);
-  delay(1000);
-
+  led.init();
 }
 
 void start_config_mode() {
@@ -52,9 +43,6 @@ void start_config_mode() {
   utils.printMacAddress(controller_addr);
   instance.begin(MASTER_MODE, evt_callback);
   instance.set_message(controller_addr, 6);
-  instance.debug([](const char* s) {
-    Serial.printf("[USER]: %s\r\n", s);
-  });
   instance.start();
 }
 
@@ -72,8 +60,21 @@ void setup()
       Serial.print("Initializing... Controller..");
       espNow.init(NOW_MODE_CONTROLLER);
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-        Serial.printf("%lu: len = %lu, data %lu \r\n", millis(), len, data[0]);
-        led.set(data[0]);
+        led.toggle();
+        utils.printMacAddress(macaddr);
+        Serial.println();
+        CMMC_SENSOR_T sensor_data;
+        memcpy(&sensor_data, data, sizeof(sensor_data));
+        Serial.printf("millis() = %lu \r\n", millis());
+        Serial.printf("batt: %lu - %02x\r\n", sensor_data.battery, sensor_data.battery);
+        Serial.printf("temp: %0.2f - %02x\r\n", sensor_data.temperature/1000.0, sensor_data.temperature);
+        Serial.printf("humid: %0.2f - %02x\r\n", sensor_data.humidity/1000.0, sensor_data.humidity);
+        u8 b = 2;
+        espNow.send(macaddr, &b, 1);
+      });
+
+      espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
+         Serial.printf("status = %lu\r\n", status);
       });
     }
     else {
