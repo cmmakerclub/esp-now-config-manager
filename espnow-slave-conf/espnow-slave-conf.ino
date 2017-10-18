@@ -20,7 +20,7 @@ extern "C" {
 #define LED_PIN 2
 #define BUTTON_PIN  0
 #define DHTPIN      12
-#define DEFAULT_DEEP_SLEEP_S 30
+#define DEFAULT_DEEP_SLEEP_S 60
 
 
 uint8_t master_mac[6];
@@ -73,13 +73,15 @@ void init_espnow() {
   uint8_t* slave_addr = CMMC::getESPNowSlaveMacAddress();
   memcpy(self_mac, slave_addr, 6);
   espNow.init(NOW_MODE_SLAVE);
+  espNow.debug([](const char* c) { Serial.println(c); });
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
     CMMC::printMacAddress(macaddr);
-    Serial.printf("status %lu\r\n", status);
+    Serial.printf("sent status %lu\r\n", status);
   });
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
+    led.toggle();
     Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
     if (data[0] == 0) data[0] = 30;
     goSleep(data[0]);
@@ -122,9 +124,6 @@ void read_sensor() {
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6);
-  CMMC::printMacAddress(master_mac, 1);
-  CMMC::printMacAddress(self_mac, 1);
-
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 
@@ -151,9 +150,11 @@ void loop()
     Serial.println("TIMEOUT...");
     goSleep(DEFAULT_DEEP_SLEEP_S);
   };
-  CMMC::dump((u8*)&packet, sizeof (packet));
+
+  espNow.enable_retries(true);
   espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 200);
 
+  delay(100);
 }
 
 void goSleep(uint32_t deepSleepS) {

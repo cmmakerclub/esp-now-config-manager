@@ -69,12 +69,13 @@ void setup()
         Serial.printf("batt: %lu - %02x\r\n", sensor_data.battery, sensor_data.battery);
         Serial.printf("temp: %0.2f - %02x\r\n", sensor_data.temperature/1000.0, sensor_data.temperature);
         Serial.printf("humid: %0.2f - %02x\r\n", sensor_data.humidity/1000.0, sensor_data.humidity);
-        u8 b = 2;
+        u8 b = 10;
         espNow.send(macaddr, &b, 1);
       });
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
-         Serial.printf("status = %lu\r\n", status);
+         CMMC::printMacAddress(macaddr);
+         Serial.printf("^ send status = %lu\r\n", status);
       });
     }
     else {
