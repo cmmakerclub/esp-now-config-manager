@@ -87,7 +87,7 @@ void setup()
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
 
-        u8 b = 2;
+        u8 b = 60;
         espNow.send(macaddr, &b, 1);
 
         Serial.write((byte*)&wrapped, sizeof(wrapped));
