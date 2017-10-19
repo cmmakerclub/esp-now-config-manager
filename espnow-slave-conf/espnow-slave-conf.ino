@@ -20,7 +20,7 @@ extern "C" {
 #define LED_PIN 2
 #define BUTTON_PIN  13
 #define DHTPIN      12
-#define DEFAULT_DEEP_SLEEP_S 600
+#define DEFAULT_DEEP_SLEEP_S 900
 
 
 uint8_t master_mac[6];
