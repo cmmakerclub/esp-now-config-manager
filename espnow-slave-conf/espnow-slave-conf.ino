@@ -32,7 +32,7 @@ CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
 CMMC_LED led(LED_PIN, HIGH);
-DHT dht = DHT(DHTPIN, dhtType);
+DHT *dht;
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -101,7 +101,9 @@ void setup()
   Serial.begin(115200);
   led.init();
   configManager.init("/config98.json");
+
   pinMode(5, INPUT_PULLUP);
+  pinMode(4, INPUT_PULLUP);
   uint8_t selective_button_pin = BUTTON_PIN;
   uint32_t wait_button_pin_ms = 1;
   if (digitalRead(5) == LOW) {
@@ -109,9 +111,13 @@ void setup()
     wait_button_pin_ms = 2000;
   }
 
+  if (digitalRead(4) == LOW) {
+    dhtType = 11;
+  }
+  
   CMMC_BootMode bootMode(&mode, selective_button_pin);
-
-  dht.begin();
+  dht = new DHT(DHTPIN, dhtType);
+  dht->begin();
 
   bootMode.init();
   bootMode.check([](int mode) {
@@ -137,8 +143,8 @@ void read_sensor() {
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 
-  float h = dht.readHumidity();
-  float t = dht.readTemperature();
+  float h = dht->readHumidity();
+  float t = dht->readTemperature();
   if (isnan(h) || isnan(t)) {
     h = 0.0;
     t = 0.0;
