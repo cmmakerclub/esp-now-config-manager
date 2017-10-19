@@ -66,28 +66,23 @@ void setup()
     else if (mode == BootMode::MODE_RUN) {
       //      Serial.print("Initializing... Controller..");
       espNow.init(NOW_MODE_CONTROLLER);
+
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-        //        Serial.println("RECV...");
+        u8 b = 60;
         led.toggle();
-        //        Serial.println();
         CMMC_SENSOR_T packet;
         CMMC_PACKET_T wrapped;
         memcpy(&packet, data, sizeof(packet));
-        //        Serial.printf("millis() = %lu \r\n", millis());
-        //        Serial.printf("batt: %lu - %02x\r\n", packet.battery, packet.battery);
-        //        Serial.printf("temp: %0.2f - %02x\r\n", packet.temperature / 1000.0, packet.temperature);
-        //        Serial.printf("humid: %0.2f - %02x\r\n", packet.humidity / 1000.0, packet.humidity);
-        //        Serial.print("from callback: ");
-        //        utils.printMacAddress(macaddr);
-        //        Serial.print("packet.from: ");
-        //        CMMC::printMacAddress(packet.from);
-        //        Serial.print("packet.to: ");
-        //        CMMC::printMacAddress(packet.to);
         wrapped.data = packet;
+        wrapped.reserved = 0xff;
+        wrapped.version = 1;
+        wrapped.type = 0x01;
+        wrapped.sleep = b;
+        wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
 
-        u8 b = 60;
+
         espNow.send(macaddr, &b, 1);
 
         Serial.write((byte*)&wrapped, sizeof(wrapped));
