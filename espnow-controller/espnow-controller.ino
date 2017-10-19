@@ -83,12 +83,7 @@ void setup()
         //        CMMC::printMacAddress(packet.from);
         //        Serial.print("packet.to: ");
         //        CMMC::printMacAddress(packet.to);
-
-        wrapped.header[0] = 0xff;
-        wrapped.header[1] = 0xfa;
         wrapped.data = packet;
-        wrapped.tail[0] = 0x0d;
-        wrapped.tail[1] = 0x0a;
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
 

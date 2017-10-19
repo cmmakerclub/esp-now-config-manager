@@ -105,7 +105,7 @@ void setup()
   configManager.init("/config98.json");
   pinMode(5, INPUT_PULLUP);
   uint8_t selective_button_pin = BUTTON_PIN;
-  uint32_t wait_button_pin_ms = 10;
+  uint32_t wait_button_pin_ms = 1;
   if (digitalRead(5) == LOW) {
     selective_button_pin = 0;
     wait_button_pin_ms = 2000;
@@ -173,7 +173,7 @@ void loop()
   }
   else {
     espNow.enable_retries(true);
-    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 700);
+    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 200);
   }
 
   delay(100);

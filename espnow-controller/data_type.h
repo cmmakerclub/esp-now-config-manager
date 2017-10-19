@@ -11,11 +11,11 @@ typedef struct __attribute((__packed__)) {
 } CMMC_SENSOR_T;
 
 typedef struct __attribute((__packed__)) {
-  uint8_t header[2];
+  uint8_t header[2] = {0xff, 0xfa};
   uint32_t reserved;
   uint16_t type;
   CMMC_SENSOR_T data;
   uint32_t sum;
-  uint8_t tail[2];
+  uint8_t tail[2] = {0x0d, 0x0a};
 } CMMC_PACKET_T;
 
