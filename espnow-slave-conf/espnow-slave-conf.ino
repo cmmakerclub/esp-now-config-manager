@@ -20,7 +20,7 @@ extern "C" {
 #define LED_PIN 2
 #define BUTTON_PIN  13
 #define DHTPIN      12
-#define DEFAULT_DEEP_SLEEP_S 900
+#define DEFAULT_DEEP_SLEEP_S 600
 
 
 uint8_t master_mac[6];
@@ -47,7 +47,7 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
     configManager.add_field("mac", buf);
     configManager.commit();
     led.high();
-    delay(1000);
+    delay(5000);
     ESP.reset();
   }
   else {
@@ -63,6 +63,7 @@ void load_config() {
       String macStr = String((*root)["mac"].as<const char*>());
       //      Serial.printf("Loaded mac %s\r\n", macStr.c_str());
       CMMC::convertMacStringToUint8(macStr.c_str(), master_mac);
+      //      CMMC::printMacAddress(master_mac);
       //      Serial.println();
     }
   });
@@ -76,6 +77,7 @@ void init_espnow() {
   });
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
+    //    CMMC::printMacAddress(macaddr);
     //    Serial.printf("sent status %lu\r\n", status);
   });
 
@@ -140,6 +142,9 @@ void read_sensor() {
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6);
+  //  CMMC::printMacAddress(packet.from);
+  //  CMMC::printMacAddress(packet.from);
+  //  CMMC::printMacAddress(packet.to);
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 

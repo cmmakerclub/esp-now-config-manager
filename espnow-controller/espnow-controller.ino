@@ -16,6 +16,7 @@ SoftwareSerial swSerial(rxPin, txPin);
 
 #define LED_PIN 2
 #define BUTTON_PIN 0
+u8 b = 60;
 
 int mode;
 
@@ -68,7 +69,7 @@ void setup()
       espNow.init(NOW_MODE_CONTROLLER);
 
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-        u8 b = 60;
+
         led.toggle();
         CMMC_SENSOR_T packet;
         CMMC_PACKET_T wrapped;
@@ -82,8 +83,10 @@ void setup()
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
 
-
+        Serial.println(b);
         espNow.send(macaddr, &b, 1);
+
+        CMMC::dump((uint8_t*)&packet, sizeof(packet));
 
         Serial.write((byte*)&wrapped, sizeof(wrapped));
         swSerial.write((byte*)&wrapped, sizeof(wrapped));
@@ -98,10 +101,24 @@ void setup()
     else {
       // unhandled
     }
-  });
+  }, 2000);
 }
+
+uint8_t c = 0;
+uint8_t buf[3];
 
 void loop()
 {
-
+  while (swSerial.available()) {
+    uint8_t _b = swSerial.read();
+    Serial.println(buf[c]);
+    buf[c++ % 3] = _b;
+    if (buf[0] == buf[1] && buf[1] == buf[2]) {
+      b = buf[0];
+      if (b > 254) b = 254;
+      Serial.println(b);
+    }
+    delay(15);
+  }
+  c = 0;
 }
