@@ -20,7 +20,7 @@ extern "C" {
 #define LED_PIN 2
 #define BUTTON_PIN  13
 #define DHTPIN      12
-#define DEFAULT_DEEP_SLEEP_S 600
+#define DEFAULT_DEEP_SLEEP_S 60
 
 
 uint8_t master_mac[6];
@@ -58,13 +58,13 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
 
 void load_config() {
   configManager.load_config([](JsonObject * root) {
-    //    Serial.println("[user] json loaded..");
+    Serial.println("[user] json loaded..");
     if (root->containsKey("mac")) {
       String macStr = String((*root)["mac"].as<const char*>());
-      //      Serial.printf("Loaded mac %s\r\n", macStr.c_str());
+      Serial.printf("Loaded mac %s\r\n", macStr.c_str());
       CMMC::convertMacStringToUint8(macStr.c_str(), master_mac);
-      //      CMMC::printMacAddress(master_mac);
-      //      Serial.println();
+      CMMC::printMacAddress(master_mac);
+      Serial.println();
     }
   });
 }
@@ -77,13 +77,14 @@ void init_espnow() {
   });
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
+    Serial.println(millis());
     //    CMMC::printMacAddress(macaddr);
-    //    Serial.printf("sent status %lu\r\n", status);
+    Serial.printf("sent status %lu\r\n", status);
   });
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
     led.toggle();
-    //    Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
+    Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
     if (data[0] == 0) data[0] = 30;
     goSleep(data[0]);
   });
@@ -100,7 +101,7 @@ void init_simple_pair() {
 }
 void setup()
 {
-  Serial.begin(115200);
+  Serial.begin(57600);
   led.init();
   configManager.init("/config98.json");
 
@@ -116,7 +117,7 @@ void setup()
   if (digitalRead(4) == LOW) {
     dhtType = 11;
   }
-  
+
   CMMC_BootMode bootMode(&mode, selective_button_pin);
   dht = new DHT(DHTPIN, dhtType);
   dht->begin();
@@ -169,7 +170,7 @@ void loop()
 {
   read_sensor();
   auto timeout_cb = []() {
-    //    Serial.println("TIMEOUT...");
+    Serial.println("TIMEOUT...");
     goSleep(DEFAULT_DEEP_SLEEP_S);
   };
 
@@ -179,14 +180,14 @@ void loop()
   }
   else {
     espNow.enable_retries(true);
-    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 200);
+    Serial.println(millis());
+    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 2000);
   }
 
   delay(100);
 }
 
 void goSleep(uint32_t deepSleepS) {
-  Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
-  ESP.deepSleep(deepSleepS * 10e5);
+//  Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
+  ESP.deepSleep(deepSleepS * 1e6);
 }
-

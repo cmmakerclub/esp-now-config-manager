@@ -11,12 +11,12 @@
 #define rxPin 14
 #define txPin 12
 
-SoftwareSerial swSerial(rxPin, txPin);
+SoftwareSerial swSerial(rxPin, txPin, false, 128);
 
 
 #define LED_PIN 2
 #define BUTTON_PIN 0
-u8 b = 60;
+u8 b = 5;
 
 int mode;
 
@@ -43,7 +43,8 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
 void setup_hardware() {
   Serial.begin(57600);
   swSerial.begin(57600);
-  Serial.flush();
+  swSerial.enableRx(true);
+  Serial.println();
   led.init();
 }
 
@@ -51,13 +52,28 @@ void start_config_mode() {
   uint8_t* controller_addr = utils.getESPNowControllerMacAddress();
   utils.printMacAddress(controller_addr);
   instance.begin(MASTER_MODE, evt_callback);
+  instance.debug([](const char* s) {
+    Serial.println(s);
+  });
   instance.set_message(controller_addr, 6);
   instance.start();
 }
+#include <Ticker.h>
+Ticker ticker;
+int counter = 0;
+
+#include <CMMC_RX_Parser.h>
+CMMC_RX_Parser parser(&swSerial);
 
 void setup()
 {
   setup_hardware();
+  parser.on_data([](CMMC_SERIAL_PACKET_T * packet) {
+    CMMC::dump((u8*)  packet, packet->len + 3);
+  });
+  ticker.attach(1, []() {
+    counter = 0;
+  });
   bootMode.init();
   bootMode.check([](int mode) {
     if (mode == BootMode::MODE_CONFIG) {
@@ -65,7 +81,7 @@ void setup()
       start_config_mode();
     }
     else if (mode == BootMode::MODE_RUN) {
-      //      Serial.print("Initializing... Controller..");
+      Serial.print("Initializing... Controller..");
       espNow.init(NOW_MODE_CONTROLLER);
 
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
@@ -82,12 +98,8 @@ void setup()
         wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
-
-        Serial.println(b);
         espNow.send(macaddr, &b, 1);
-
-        CMMC::dump((uint8_t*)&packet, sizeof(packet));
-
+        //        CMMC::dump((uint8_t*)&packet, sizeof(packet));
         Serial.write((byte*)&wrapped, sizeof(wrapped));
         swSerial.write((byte*)&wrapped, sizeof(wrapped));
 
@@ -95,7 +107,7 @@ void setup()
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
         // CMMC::printMacAddress(macaddr);
-        // Serial.printf("^ send status = %lu\r\n", status);
+        //        Serial.printf("^ send status = %lu\r\n", status);
       });
     }
     else {
@@ -107,18 +119,10 @@ void setup()
 uint8_t c = 0;
 uint8_t buf[3];
 
+
 void loop()
 {
-  while (swSerial.available()) {
-    uint8_t _b = swSerial.read();
-    Serial.println(buf[c]);
-    buf[c++ % 3] = _b;
-    if (buf[0] == buf[1] && buf[1] == buf[2]) {
-      b = buf[0];
-      if (b > 254) b = 254;
-      Serial.println(b);
-    }
-    delay(15);
-  }
-  c = 0;
+  parser.process();
+  counter++;
+  delay(1);
 }
