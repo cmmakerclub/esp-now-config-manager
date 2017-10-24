@@ -156,8 +156,8 @@ void read_sensor() {
     t = 0.0;
     //    Serial.println("Failed to read from DHT sensor!");
   } else {
-    packet.temperature = t;
-    packet.humidity = h;
+    packet.temperature = t*100;
+    packet.humidity = h*100;
   }
 
   packet.ms = millis();

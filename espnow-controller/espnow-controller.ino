@@ -8,11 +8,14 @@
 #include "data_type.h"
 
 #include <SoftwareSerial.h>
+#include <Ticker.h>
 #define rxPin 14
 #define txPin 12
 
-SoftwareSerial swSerial(rxPin, txPin, false, 128);
+bool serialBusy = false;
 
+SoftwareSerial swSerial(rxPin, txPin, false, 128);
+Ticker ticker;
 
 #define LED_PIN 2
 #define BUTTON_PIN 0
@@ -25,6 +28,8 @@ CMMC_ESPNow espNow;
 CMMC_Utils utils;
 CMMC_LED led(LED_PIN, HIGH);
 CMMC_BootMode bootMode(&mode, BUTTON_PIN);
+
+uint8_t mmm[6];
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -43,7 +48,7 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
 void setup_hardware() {
   Serial.begin(57600);
   swSerial.begin(57600);
-  swSerial.enableRx(true);
+  //  swSerial.enableRx(true);
   Serial.println();
   led.init();
 }
@@ -58,22 +63,37 @@ void start_config_mode() {
   instance.set_message(controller_addr, 6);
   instance.start();
 }
-#include <Ticker.h>
-Ticker ticker;
+bool dirty = false;
 int counter = 0;
 
 #include <CMMC_RX_Parser.h>
 CMMC_RX_Parser parser(&swSerial);
 
+typedef struct __attribute((__packed__)) {
+  uint32_t time;
+} CMMC_SLEEP_TIME_T;
+
+
 void setup()
 {
   setup_hardware();
-  parser.on_data([](CMMC_SERIAL_PACKET_T * packet) {
-    CMMC::dump((u8*)  packet, packet->len + 3);
+  parser.on_command_arrived([](CMMC_SERIAL_PACKET_T * packet) {
+    CMMC_SLEEP_TIME_T t;
+    if (packet->cmd == CMMC_SLEEP_TIME_CMD) {
+      memcpy(&t.time, packet->data, 4);
+      //      Serial.printf("time = %lu \r\n", t.time);
+      b = t.time;
+
+      if (t.time > 255) {
+        b = 254;
+      }
+
+    }
   });
-  ticker.attach(1, []() {
-    counter = 0;
-  });
+  //  ticker.attach(1000, []() {
+  ////    espNowTask = 1;
+  //  });
+
   bootMode.init();
   bootMode.check([](int mode) {
     if (mode == BootMode::MODE_CONFIG) {
@@ -82,32 +102,43 @@ void setup()
     }
     else if (mode == BootMode::MODE_RUN) {
       Serial.print("Initializing... Controller..");
+      espNow.debug([](const char* s) {
+        //        Serial.println(s);
+      });
       espNow.init(NOW_MODE_CONTROLLER);
+
 
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
 
+        memcpy(mmm, macaddr, 6);
+        dirty = true;
+        serialBusy = true;
         led.toggle();
         CMMC_SENSOR_T packet;
         CMMC_PACKET_T wrapped;
         memcpy(&packet, data, sizeof(packet));
         wrapped.data = packet;
         wrapped.reserved = 0xff;
-        wrapped.version = 1;
-        wrapped.type = 0x01;
+        wrapped.version = 2;
         wrapped.sleep = b;
         wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
-        espNow.send(macaddr, &b, 1);
-        //        CMMC::dump((uint8_t*)&packet, sizeof(packet));
+        //        Serial.println("OK");
+        //        CMMC::dump((uint8_t*)&macaddr, 6);
+
+        //        CMMC::dump((uint8_t*)&wrapped, sizeof(wrapped));
         Serial.write((byte*)&wrapped, sizeof(wrapped));
         swSerial.write((byte*)&wrapped, sizeof(wrapped));
+
 
       });
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
-        // CMMC::printMacAddress(macaddr);
-        //        Serial.printf("^ send status = %lu\r\n", status);
+        //CMMC::printMacAddress(macaddr);
+        //Serial.printf("^ send status = %lu\r\n", status);
+        serialBusy = false;
+        dirty = false;
       });
     }
     else {
@@ -116,13 +147,17 @@ void setup()
   }, 2000);
 }
 
-uint8_t c = 0;
-uint8_t buf[3];
-
-
 void loop()
 {
-  parser.process();
-  counter++;
-  delay(1);
+  if (serialBusy == false) {
+    //Serial.println("processing...");
+    parser.process();
+    delay(1);
+  }
+  yield();
+
+  while (dirty) {
+    espNow.send(mmm, &b, 1);
+    delay(1);
+  }
 }
