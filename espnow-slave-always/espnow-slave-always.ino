@@ -7,6 +7,7 @@
 #include <CMMC_ESPNow.h>
 #include <CMMC_BootMode.h>
 #include <CMMC_LED.h>
+#include <CMMC_Ticker.h>
 #include "FS.h"
 
 #include "data_type.h"
@@ -17,9 +18,7 @@ extern "C" {
 }
 
 #define LED_PIN 2
-#define BUTTON_PIN  13
-#define DEFAULT_DEEP_SLEEP_S 60
-
+#define BUTTON_PIN  0
 
 uint8_t master_mac[6];
 uint8_t self_mac[6];
@@ -29,6 +28,7 @@ CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
 CMMC_LED led(LED_PIN, HIGH);
+CMMC_Ticker ticker;
 
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -69,7 +69,7 @@ void init_espnow() {
   memcpy(self_mac, slave_addr, 6);
   espNow.init(NOW_MODE_SLAVE);
   espNow.debug([](const char* c) {
-    //    Serial.println(c);
+    Serial.println(c);
   });
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
@@ -80,12 +80,14 @@ void init_espnow() {
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
     led.toggle();
-    Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
-    if (data[0] == 0) data[0] = 30;
-    goSleep(data[0]);
   });
+
+  ticker.start();
 }
 void init_simple_pair() {
+  simplePair.debug([](const char* c) {
+    Serial.println(c);
+  });
   simplePair.begin(SLAVE_MODE, evt_callback);
   simplePair.debug([](const char* c) {
     Serial.println(c);
@@ -97,21 +99,20 @@ void init_simple_pair() {
 }
 void setup()
 {
+
+
   Serial.begin(57600);
+  Serial.println("HELLO");
+  SPIFFS.begin();
+
   led.init();
+  led.low();
+  delay(1000);
+  configManager.add_debug_listener([](const char* c) {
+    Serial.println(c);
+  });
   configManager.init("/config98.json");
-
-  pinMode(5, INPUT_PULLUP);
-  pinMode(4, INPUT_PULLUP);
-  uint8_t selective_button_pin = BUTTON_PIN;
-  uint32_t wait_button_pin_ms = 1;
-  if (digitalRead(5) == LOW) {
-    selective_button_pin = 0;
-    wait_button_pin_ms = 2000;
-  }
-
-  CMMC_BootMode bootMode(&mode, selective_button_pin);
-
+  CMMC_BootMode bootMode(&mode, 0);
 
   bootMode.init();
   bootMode.check([](int mode) {
@@ -125,49 +126,48 @@ void setup()
     else {
       // unhandled
     }
-  }, wait_button_pin_ms);
+  }, 2000);
 }
 
-CMMC_SENSOR_T packet;
 
-void read_sensor() {
+
+void send_keep_alive() {
+  CMMC_SENSOR_T packet;
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6);
-  //  CMMC::printMacAddress(packet.from);
-  //  CMMC::printMacAddress(packet.from);
-  //  CMMC::printMacAddress(packet.to);
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
-
   packet.ms = millis();
-  //  Serial.printf("%lu - %02x\r\n", packet.battery, packet.battery);
-  //  Serial.printf("%lu - %02x\r\n", packet.temperature, packet.temperature);
-  //  Serial.printf("%lu - %02x\r\n", packet.humidity, packet.humidity);
+  send(master_mac, (u8*)&packet);
 
 }
-void loop()
-{
-  read_sensor();
-  auto timeout_cb = []() {
-    Serial.println("TIMEOUT...");
-    goSleep(DEFAULT_DEEP_SLEEP_S);
+
+void send(uint8_t *mac, u8* packet) {
+  static auto timeout_cb = []() {
+    Serial.println("SEND TIMEOUT...");
   };
 
-
-  if (master_mac[0] == 0x00 && master_mac[1] == 0x00) {
-    goSleep(DEFAULT_DEEP_SLEEP_S);
+  if (mac[0] == 0x00 && mac[1] == 0x00) {
+    Serial.println("Invalid target");
   }
   else {
     espNow.enable_retries(true);
     Serial.println(millis());
-    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 2000);
+    espNow.send(mac, (u8*)&packet, sizeof (*packet), timeout_cb, 2000);
   }
 
-  delay(100);
 }
 
-void goSleep(uint32_t deepSleepS) {
-  //  Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
-  ESP.deepSleep(deepSleepS * 1e6);
+void loop()
+{
+  if (ticker.is_dirty()) {
+    Serial.println("Ticker.tick");
+    send_keep_alive();
+    ticker.clear_dirty();
+  }
+
+  Serial.println("HELLO...");
+  delay(500);
+
 }
