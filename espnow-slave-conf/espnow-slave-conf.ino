@@ -37,6 +37,7 @@ CMMC_ESPNow espNow;
 CMMC_LED led(LED_PIN, HIGH);
 DHT *dht;
 
+bool sp_flag_done = false;
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
     char buf[13];
@@ -49,12 +50,8 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
     CMMC::printMacAddress((uint8_t*)buf);
     configManager.add_field("mac", buf);
     configManager.commit();
-    led.high();
-    while (digitalRead(selective_button_pin) == LOW) {
-      led.toggle();
-      delay(50);
-    }
-    ESP.reset();
+    Serial.println("DONE...");
+    sp_flag_done = true;
   }
   else {
     Serial.printf("[CSP_EVENT_ERROR] %d: %s\r\n", status, (const char*)data);
@@ -97,9 +94,19 @@ void init_simple_pair() {
   CMMC_TimeOut ct;
   ct.timeout_ms(3000);
   while (1) {
-    if (ct.is_timeout()) ESP.reset();
+    if (ct.is_timeout()) {
+      Serial.println("timeout");
+      if (digitalRead(selective_button_pin) == LOW) {
+        ct.yield();
+        Serial.println("YIELDING...");
+      }
+      else {
+        ESP.reset();
+      }
+    }
     led.toggle();
-    delay(50);
+
+    delay(50L + (100 * sp_flag_done));
   }
 }
 void setup()
@@ -107,7 +114,6 @@ void setup()
   Serial.begin(57600);
   led.init();
   configManager.init("/config98.json");
-
   pinMode(5, INPUT_PULLUP);
   pinMode(4, INPUT_PULLUP);
 
@@ -116,8 +122,6 @@ void setup()
   dhtType = digitalRead(4) ? 22 : 11;
 
   CMMC_BootMode bootMode(&mode, selective_button_pin);
-  dht = new DHT(DHTPIN, dhtType);
-  dht->begin();
 
   bootMode.init();
   bootMode.check([](int mode) {
@@ -126,6 +130,8 @@ void setup()
     }
     else if (mode == BootMode::MODE_RUN) {
       load_config();
+      dht = new DHT(DHTPIN, dhtType);
+      dht->begin();
       init_espnow();
     }
     else {
@@ -161,14 +167,15 @@ void read_sensor() {
   //  Serial.printf("%lu - %02x\r\n", packet.humidity, packet.humidity);
 
 }
+
+auto timeout_cb = []() {
+  Serial.println("TIMEOUT...");
+  goSleep(DEFAULT_DEEP_SLEEP_S);
+};
+
 void loop()
 {
   read_sensor();
-  auto timeout_cb = []() {
-    Serial.println("TIMEOUT...");
-    goSleep(DEFAULT_DEEP_SLEEP_S);
-  };
-
 
   if (master_mac[0] == 0x00 && master_mac[1] == 0x00) {
     goSleep(DEFAULT_DEEP_SLEEP_S);
@@ -176,7 +183,7 @@ void loop()
   else {
     espNow.enable_retries(true);
     Serial.println(millis());
-    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 2000);
+    espNow.send(master_mac, (u8*)&packet, sizeof (packet), timeout_cb, 3000);
   }
 
   delay(100);
