@@ -90,10 +90,6 @@ void setup()
 
     }
   });
-  //  ticker.attach(1000, []() {
-  ////    espNowTask = 1;
-  //  });
-
   bootMode.init();
   bootMode.check([](int mode) {
     if (mode == BootMode::MODE_CONFIG) {
@@ -124,19 +120,11 @@ void setup()
         wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
-        //        Serial.println("OK");
-        //        CMMC::dump((uint8_t*)&macaddr, 6);
-
-        //        CMMC::dump((uint8_t*)&wrapped, sizeof(wrapped));
         Serial.write((byte*)&wrapped, sizeof(wrapped));
         swSerial.write((byte*)&wrapped, sizeof(wrapped));
-
-
       });
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
-        //CMMC::printMacAddress(macaddr);
-        //Serial.printf("^ send status = %lu\r\n", status);
         serialBusy = false;
         dirty = false;
       });
@@ -150,7 +138,6 @@ void setup()
 void loop()
 {
   if (serialBusy == false) {
-    //Serial.println("processing...");
     parser.process();
     delay(1);
   }
