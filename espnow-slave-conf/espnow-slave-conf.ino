@@ -106,7 +106,7 @@ void init_simple_pair() {
     }
     led.toggle();
 
-    delay(50L + (100 * sp_flag_done));
+    delay(50L + (250 * sp_flag_done));
   }
 }
 void setup()
@@ -165,7 +165,6 @@ void read_sensor() {
   //  Serial.printf("%lu - %02x\r\n", packet.battery, packet.battery);
   //  Serial.printf("%lu - %02x\r\n", packet.temperature, packet.temperature);
   //  Serial.printf("%lu - %02x\r\n", packet.humidity, packet.humidity);
-
 }
 
 auto timeout_cb = []() {

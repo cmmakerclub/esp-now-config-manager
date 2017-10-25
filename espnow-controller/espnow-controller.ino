@@ -11,14 +11,13 @@
 #include "data_type.h"
 
 #include <SoftwareSerial.h>
-#include <Ticker.h>
 #define rxPin 14
 #define txPin 12
 
 bool serialBusy = false;
+bool dirty = false;
 
 SoftwareSerial swSerial(rxPin, txPin, false, 128);
-Ticker ticker;
 
 #define LED_PIN 2
 #define BUTTON_PIN 13
@@ -29,7 +28,7 @@ int mode;
 CMMC_SimplePair instance;
 CMMC_ESPNow espNow;
 CMMC_Utils utils;
-CMMC_LED led(LED_PIN, HIGH);
+CMMC_LED led(LED_PIN, LOW);
 CMMC_BootMode bootMode(&mode, BUTTON_PIN);
 
 uint8_t mmm[6];
@@ -66,7 +65,8 @@ void start_config_mode() {
   instance.set_message(controller_addr, 6);
   instance.start();
 }
-bool dirty = false;
+
+
 int counter = 0;
 
 #include <CMMC_RX_Parser.h>
@@ -84,7 +84,6 @@ void setup()
     CMMC_SLEEP_TIME_T t;
     if (packet->cmd == CMMC_SLEEP_TIME_CMD) {
       memcpy(&t.time, packet->data, 4);
-      //      Serial.printf("time = %lu \r\n", t.time);
       b = t.time;
 
       if (t.time > 255) {
@@ -96,19 +95,13 @@ void setup()
   bootMode.init();
   bootMode.check([](int mode) {
     if (mode == BootMode::MODE_CONFIG) {
-      led.low();
       start_config_mode();
     }
     else if (mode == BootMode::MODE_RUN) {
+      led.high();
       Serial.print("Initializing... Controller..");
-      espNow.debug([](const char* s) {
-        //        Serial.println(s);
-      });
       espNow.init(NOW_MODE_CONTROLLER);
-
-
       espNow.on_message_recv([](uint8_t *macaddr, uint8_t *data, uint8_t len) {
-
         memcpy(mmm, macaddr, 6);
         dirty = true;
         serialBusy = true;
@@ -117,8 +110,6 @@ void setup()
         CMMC_PACKET_T wrapped;
         memcpy(&packet, data, sizeof(packet));
         wrapped.data = packet;
-        wrapped.reserved = 0xff;
-        wrapped.version = 2;
         wrapped.sleep = b;
         wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
@@ -135,31 +126,36 @@ void setup()
     else {
       // unhandled
     }
-  }, 2000);
+  }, 300);
 }
 
 #include <CMMC_TimeOut.h>
 CMMC_TimeOut ct;
 void loop()
 {
-
+  while (mode == BootMode::MODE_CONFIG) {
+    ct.timeout_ms(30000);
+    while (1 && !ct.is_timeout()) {
+      delay(500);
+      led.toggle();
+    }
+    Serial.println("Simple Pair Wait timeout.");
+    ESP.reset();
+  }
   if (serialBusy == false) {
     parser.process();
     delay(1);
   }
-  yield();
 
   while (dirty) {
     espNow.send(mmm, &b, 1);
     delay(1);
   }
 
-
   ct.timeout_ms(5000);
   while (digitalRead(13) == LOW) {
     if (ct.is_timeout()) {
       ESP.reset();
     }
-    yield();
   }
 }

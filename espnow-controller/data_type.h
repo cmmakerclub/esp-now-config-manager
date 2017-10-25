@@ -17,8 +17,8 @@ typedef struct __attribute((__packed__)) {
 
 typedef struct __attribute((__packed__)) {
   uint8_t header[2] = {0x7e, 0x7f};
-  uint8_t version;
-  uint32_t reserved = 0x00; 
+  uint8_t version = 2;
+  uint32_t reserved = 0xff; 
   CMMC_SENSOR_T data;
   uint32_t sleep;
   uint32_t ms;
