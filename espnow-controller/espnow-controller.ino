@@ -1,3 +1,6 @@
+#define CMMC_USE_ALIAS
+
+
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <CMMC_SimplePair.h>
@@ -18,7 +21,7 @@ SoftwareSerial swSerial(rxPin, txPin, false, 128);
 Ticker ticker;
 
 #define LED_PIN 2
-#define BUTTON_PIN 0
+#define BUTTON_PIN 13
 u8 b = 5;
 
 int mode;
@@ -135,8 +138,11 @@ void setup()
   }, 2000);
 }
 
+#include <CMMC_TimeOut.h>
+CMMC_TimeOut ct;
 void loop()
 {
+
   if (serialBusy == false) {
     parser.process();
     delay(1);
@@ -146,5 +152,14 @@ void loop()
   while (dirty) {
     espNow.send(mmm, &b, 1);
     delay(1);
+  }
+
+
+  ct.timeout_ms(5000);
+  while (digitalRead(13) == LOW) {
+    if (ct.is_timeout()) {
+      ESP.reset();
+    }
+    yield();
   }
 }
