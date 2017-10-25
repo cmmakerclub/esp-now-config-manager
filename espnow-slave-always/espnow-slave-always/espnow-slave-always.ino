@@ -131,8 +131,6 @@ void setup()
   }, 2000);
 }
 
-
-
 void send_keep_alive() {
   CMMC_SENSOR_T packet;
   packet.battery = analogRead(A0);
@@ -158,7 +156,6 @@ void send(uint8_t *mac, u8* packet) {
     Serial.println(millis());
     espNow.send(mac, (u8*)&packet, sizeof (*packet), timeout_cb, 2000);
   }
-
 }
 
 void loop()
