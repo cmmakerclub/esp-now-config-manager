@@ -1,0 +1,27 @@
+#######################################
+# Syntax Coloring Map For CMMC_ESPNow
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+CMMC_ESPNow	KEYWORD1
+ESPNow		KEYWORD1
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin		KEYWORD2
+on_message_recv		KEYWORD2
+on_message_sent		KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+NOW_MODE_SLAVE			KEYWORD2
+NOW_MODE_CONTROLLER		KEYWORD2

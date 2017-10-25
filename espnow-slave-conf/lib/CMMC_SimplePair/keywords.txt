@@ -1,0 +1,28 @@
+#######################################
+# Syntax Coloring Map For CMMC_SimplePair
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+CMMC_SimplePair		KEYWORD1
+SimplePair			KEYWORD1
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+begin				KEYWORD2
+on					KEYWORD2
+debug				KEYWORD2
+add_listener		KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+CSP_MODE_AP			LITERAL1
+CSP_MODE_STA		LITERAL1
+CSP_EVENT_SUCCESS	LITERAL1
+CSP_EVENT_ERROR		LITERAL1
