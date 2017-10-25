@@ -1,3 +1,5 @@
+#define CMMC_USE_ALIAS
+
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
@@ -7,6 +9,7 @@
 #include <CMMC_ESPNow.h>
 #include <CMMC_BootMode.h>
 #include <CMMC_LED.h>
+#include <CMMC_TimeOut.h>
 #include <DHT.h>
 #include "FS.h"
 
@@ -18,11 +21,11 @@ extern "C" {
 }
 
 #define LED_PIN 2
-#define BUTTON_PIN  13
 #define DHTPIN      12
 #define DEFAULT_DEEP_SLEEP_S 60
 
-
+uint8_t selective_button_pin = 13;
+uint32_t wait_button_pin_ms = 1;
 uint8_t master_mac[6];
 uint8_t self_mac[6];
 int dhtType = 22;
@@ -47,7 +50,10 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
     configManager.add_field("mac", buf);
     configManager.commit();
     led.high();
-    delay(5000);
+    while (digitalRead(selective_button_pin) == LOW) {
+      led.toggle();
+      delay(50);
+    }
     ESP.reset();
   }
   else {
@@ -91,12 +97,18 @@ void init_espnow() {
 }
 void init_simple_pair() {
   simplePair.begin(SLAVE_MODE, evt_callback);
-  simplePair.debug([](const char* c) {
-    Serial.println(c);
-  });
+  //  simplePair.debug([](const char* c) {
+  //    Serial.println(c);
+  //  });
   simplePair.start();
+  CMMC_TimeOut ct;
+  ct.timeout_ms(3000);
   while (1) {
-    yield();
+    if (ct.is_timeout()) {
+      ESP.reset();
+    }
+    delay(50);
+    led.toggle();
   }
 }
 void setup()
@@ -107,16 +119,10 @@ void setup()
 
   pinMode(5, INPUT_PULLUP);
   pinMode(4, INPUT_PULLUP);
-  uint8_t selective_button_pin = BUTTON_PIN;
-  uint32_t wait_button_pin_ms = 1;
-  if (digitalRead(5) == LOW) {
-    selective_button_pin = 0;
-    wait_button_pin_ms = 2000;
-  }
 
-  if (digitalRead(4) == LOW) {
-    dhtType = 11;
-  }
+  selective_button_pin = digitalRead(5) ? 13 : 0;
+  wait_button_pin_ms = digitalRead(5) ?  1 : 2000;
+  dhtType = digitalRead(4) ? 22 : 11;
 
   CMMC_BootMode bootMode(&mode, selective_button_pin);
   dht = new DHT(DHTPIN, dhtType);
@@ -156,8 +162,8 @@ void read_sensor() {
     t = 0.0;
     //    Serial.println("Failed to read from DHT sensor!");
   } else {
-    packet.temperature = t*100;
-    packet.humidity = h*100;
+    packet.temperature = t * 100;
+    packet.humidity = h * 100;
   }
 
   packet.ms = millis();
@@ -188,6 +194,6 @@ void loop()
 }
 
 void goSleep(uint32_t deepSleepS) {
-//  Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
+  //  Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
   ESP.deepSleep(deepSleepS * 1e6);
 }
