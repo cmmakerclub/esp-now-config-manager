@@ -95,12 +95,12 @@ void init_simple_pair() {
   ct.timeout_ms(3000);
   while (1) {
     if (ct.is_timeout()) {
-      Serial.println("timeout");
-      if (digitalRead(selective_button_pin) == LOW) {
+      if (sp_flag_done && digitalRead(selective_button_pin) == LOW) {
         ct.yield();
         Serial.println("YIELDING...");
       }
       else {
+        Serial.println("timeout");
         ESP.reset();
       }
     }
