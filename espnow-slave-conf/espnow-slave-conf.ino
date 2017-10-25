@@ -78,13 +78,9 @@ void init_espnow() {
   uint8_t* slave_addr = CMMC::getESPNowSlaveMacAddress();
   memcpy(self_mac, slave_addr, 6);
   espNow.init(NOW_MODE_SLAVE);
-  espNow.debug([](const char* c) {
-    //    Serial.println(c);
-  });
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
     Serial.println(millis());
-    //    CMMC::printMacAddress(macaddr);
     Serial.printf("sent status %lu\r\n", status);
   });
 
@@ -97,18 +93,13 @@ void init_espnow() {
 }
 void init_simple_pair() {
   simplePair.begin(SLAVE_MODE, evt_callback);
-  //  simplePair.debug([](const char* c) {
-  //    Serial.println(c);
-  //  });
   simplePair.start();
   CMMC_TimeOut ct;
   ct.timeout_ms(3000);
   while (1) {
-    if (ct.is_timeout()) {
-      ESP.reset();
-    }
-    delay(50);
+    if (ct.is_timeout()) ESP.reset();
     led.toggle();
+    delay(50);
   }
 }
 void setup()
@@ -149,9 +140,8 @@ void read_sensor() {
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6);
-  //  CMMC::printMacAddress(packet.from);
-  //  CMMC::printMacAddress(packet.from);
-  //  CMMC::printMacAddress(packet.to);
+  //CMMC::printMacAddress(packet.from);
+  //CMMC::printMacAddress(packet.to);
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 
@@ -160,7 +150,6 @@ void read_sensor() {
   if (isnan(h) || isnan(t)) {
     h = 0.0;
     t = 0.0;
-    //    Serial.println("Failed to read from DHT sensor!");
   } else {
     packet.temperature = t * 100;
     packet.humidity = h * 100;
@@ -194,6 +183,6 @@ void loop()
 }
 
 void goSleep(uint32_t deepSleepS) {
-  //  Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
+  //Serial.printf("\r\nGo sleep for .. %lu seconds. \r\n", deepSleepS);
   ESP.deepSleep(deepSleepS * 1e6);
 }
