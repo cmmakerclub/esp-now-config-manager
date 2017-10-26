@@ -74,6 +74,8 @@ void load_config() {
 void init_espnow() {
   uint8_t* slave_addr = CMMC::getESPNowSlaveMacAddress();
   memcpy(self_mac, slave_addr, 6);
+  Serial.print("Slave Mac Address: ");
+  CMMC::printMacAddress(self_mac, true);
   espNow.init(NOW_MODE_SLAVE);
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
     led.toggle();
@@ -97,10 +99,9 @@ void init_simple_pair() {
     if (ct.is_timeout()) {
       if (sp_flag_done && digitalRead(selective_button_pin) == LOW) {
         ct.yield();
-        Serial.println("YIELDING...");
       }
       else {
-        Serial.println("timeout");
+        Serial.println("timeout..........");
         ESP.reset();
       }
     }
@@ -121,6 +122,9 @@ void setup()
   wait_button_pin_ms = digitalRead(5) ?  1 : 2000;
   dhtType = digitalRead(4) ? 22 : 11;
 
+  dht = new DHT(DHTPIN, dhtType);
+  dht->begin();
+
   CMMC_BootMode bootMode(&mode, selective_button_pin);
 
   bootMode.init();
@@ -130,8 +134,6 @@ void setup()
     }
     else if (mode == BootMode::MODE_RUN) {
       load_config();
-      dht = new DHT(DHTPIN, dhtType);
-      dht->begin();
       init_espnow();
     }
     else {
