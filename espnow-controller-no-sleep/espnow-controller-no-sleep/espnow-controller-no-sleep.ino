@@ -22,6 +22,7 @@ SoftwareSerial swSerial(rxPin, txPin, false, 128);
 #define LED_PIN 2
 
 uint8_t selective_button_pin = 13;
+u8 b = 5;
 
 int mode;
 
@@ -84,6 +85,12 @@ void setup()
   parser.on_command_arrived([](CMMC_SERIAL_PACKET_T * packet) {
     CMMC_SLEEP_TIME_T t;
     if (packet->cmd == CMMC_SLEEP_TIME_CMD) {
+      memcpy(&t.time, packet->data, 4);
+      b = t.time;
+
+      if (t.time > 255) {
+        b = 254;
+      }
     }
   });
 
@@ -115,6 +122,7 @@ void setup()
         CMMC_PACKET_T wrapped;
         memcpy(&packet, data, sizeof(packet));
         wrapped.data = packet;
+        wrapped.sleep = b;
         wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
@@ -152,7 +160,7 @@ void loop()
   }
 
   while (dirty) {
-    //espNow.send(mmm, &b, 1);
+    espNow.send(mmm, &b, 1);
     delay(1);
   }
 

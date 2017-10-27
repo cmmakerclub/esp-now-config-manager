@@ -29,7 +29,7 @@ extern "C" {
 #include <user_interface.h>
 }
 
-#define LED_PIN 2
+#define LED_PIN      2
 #define DHTPIN      12
 #define DEFAULT_DEEP_SLEEP_S 60
 
@@ -47,10 +47,10 @@ CMMC_ESPNow espNow;
 CMMC_LED led(LED_PIN, HIGH);
 
 u8 _pixel_dirty = false;
-u8 _pixel_no = data[0];
-u8 _pixel_r  = data[1];
-u8 _pixel_g  = data[2];
-u8 _pixel_b  = data[3];
+u8 _pixel_no = 0;
+u8 _pixel_r  = 0;
+u8 _pixel_g  = 0;
+u8 _pixel_b  = 0;
 bool sp_flag_done = false;
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -96,7 +96,7 @@ void init_espnow() {
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
     led.toggle();
-    Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
+    Serial.printf("GOT data  = %u byte\r\n", len);
     _pixel_dirty = true;
     _pixel_no = data[0];
     _pixel_r  = data[1];
@@ -130,6 +130,7 @@ void setup()
   led.init();
   configManager.init("/config98.json");
   pixels.begin();
+
   pinMode(5, INPUT_PULLUP);
   pinMode(4, INPUT_PULLUP);
 
@@ -138,7 +139,6 @@ void setup()
 
 
   CMMC_BootMode bootMode(&mode, selective_button_pin);
-
   bootMode.init();
   bootMode.check([](int mode) {
     if (mode == BootMode::MODE_CONFIG) {
@@ -156,41 +156,36 @@ void setup()
   tm.timeout_ms(10);
 }
 
-CMMC_SENSOR_T packet;
-
-void read_sensor() {
-  packet.battery = analogRead(A0);
-  memcpy(packet.to, master_mac, 6);
-  memcpy(packet.from, self_mac, 6);
-  //CMMC::printMacAddress(packet.from);
-  //CMMC::printMacAddress(packet.to);
-  packet.sum = CMMC::checksum((uint8_t*) &packet,
-                              sizeof(packet) - sizeof(packet.sum));
-  packet.ms = millis();
-}
-
-auto timeout_cb = []() {
-  Serial.println("TIMEOUT...");
-};
-
-int dirty = 0;
 int counter = 0;
 CMMC_Interval _1s;
 CMMC_Interval interval;
+CMMC_SENSOR_T packet;
+uint8_t must_send_keep_alive = 0;
 void loop()
 {
-  if (dirty) {
-    pixels.setPixelColor(1, pixels.Color(8, 1, 0));
-    dirty = false;
-  }
+  interval.every_ms(1, []() {
+    if (_pixel_dirty) {
+      pixels.setPixelColor(_pixel_no, pixels.Color(_pixel_r, _pixel_g, _pixel_b));
+      pixels.show();
+      _pixel_dirty = false;
+    }
 
-  interval.every_ms(5, []() {
-    pixels.show();
     counter++;
   });
 
   _1s.every_ms(1000, []() {
-    printf("freq = %lu\r\n", counter);
+    packet.battery = analogRead(A0);
+    memcpy(packet.to, master_mac, 6);
+    memcpy(packet.from, self_mac, 6);
+    packet.sum = CMMC::checksum((uint8_t*) &packet,
+                                sizeof(packet) - sizeof(packet.sum));
     counter = 0;
+    must_send_keep_alive = 1;
   });
+  if (must_send_keep_alive) {
+    Serial.println(millis());
+    espNow.send(master_mac, (u8*)&packet, sizeof (packet));
+    must_send_keep_alive = 0;
+    delay(10);
+  }
 }

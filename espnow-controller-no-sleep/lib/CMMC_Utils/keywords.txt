@@ -1,0 +1,28 @@
+#######################################
+# Syntax Coloring Map For CMMC_Utils
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+CMMC_Utils	KEYWORD1
+Utils		KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin 					KEYWORD2
+convertMacStringToUint8	KEYWORD2
+printMacAddress		KEYWORD2
+getESPNowSlaveMacAddress		KEYWORD2
+dump	KEYWORD2
+macByteToString	KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################
