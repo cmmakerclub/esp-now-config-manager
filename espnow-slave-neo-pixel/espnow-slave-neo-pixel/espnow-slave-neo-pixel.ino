@@ -12,9 +12,18 @@
 #include <CMMC_TimeOut.h>
 #include <DHT.h>
 #include "FS.h"
-
+#include <CMMC_TimeOut.h>
+#include "CMMC_Interval.hpp"
 #include "data_type.h"
 
+#include <Adafruit_NeoPixel.h>
+
+#define PIN            13
+#define NUMPIXELS      5
+
+Adafruit_NeoPixel pixels = Adafruit_NeoPixel(NUMPIXELS, PIN, NEO_GRB + NEO_KHZ400);
+
+int delayval = 50; // delay for half a second
 extern "C" {
 #include <espnow.h>
 #include <user_interface.h>
@@ -28,15 +37,20 @@ uint8_t selective_button_pin = 13;
 uint32_t wait_button_pin_ms = 1;
 uint8_t master_mac[6];
 uint8_t self_mac[6];
-int dhtType = 22;
+CMMC_TimeOut tm;
+
 int mode;
 
 CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
 CMMC_LED led(LED_PIN, HIGH);
-DHT *dht;
 
+u8 _pixel_dirty = false;
+u8 _pixel_no = data[0];
+u8 _pixel_r  = data[1];
+u8 _pixel_g  = data[2];
+u8 _pixel_b  = data[3];
 bool sp_flag_done = false;
 void evt_callback(u8 status, u8* sa, const u8* data) {
   if (status == 0) {
@@ -58,7 +72,6 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
   }
 }
 
-
 void load_config() {
   configManager.load_config([](JsonObject * root) {
     Serial.println("[user] json loaded..");
@@ -78,14 +91,17 @@ void init_espnow() {
   CMMC::printMacAddress(self_mac, true);
   espNow.init(NOW_MODE_SLAVE);
   espNow.on_message_sent([](uint8_t *macaddr, u8 status) {
-    led.toggle();
-    Serial.println(millis());
     Serial.printf("sent status %lu\r\n", status);
   });
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
     led.toggle();
     Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
+    _pixel_dirty = true;
+    _pixel_no = data[0];
+    _pixel_r  = data[1];
+    _pixel_g  = data[2];
+    _pixel_b  = data[3];
   });
 }
 void init_simple_pair() {
@@ -113,6 +129,7 @@ void setup()
   Serial.begin(57600);
   led.init();
   configManager.init("/config98.json");
+  pixels.begin();
   pinMode(5, INPUT_PULLUP);
   pinMode(4, INPUT_PULLUP);
 
@@ -135,6 +152,8 @@ void setup()
       // unhandled
     }
   }, wait_button_pin_ms);
+
+  tm.timeout_ms(10);
 }
 
 CMMC_SENSOR_T packet;
@@ -154,7 +173,24 @@ auto timeout_cb = []() {
   Serial.println("TIMEOUT...");
 };
 
+int dirty = 0;
+int counter = 0;
+CMMC_Interval _1s;
+CMMC_Interval interval;
 void loop()
 {
+  if (dirty) {
+    pixels.setPixelColor(1, pixels.Color(8, 1, 0));
+    dirty = false;
+  }
 
+  interval.every_ms(5, []() {
+    pixels.show();
+    counter++;
+  });
+
+  _1s.every_ms(1000, []() {
+    printf("freq = %lu\r\n", counter);
+    counter = 0;
+  });
 }
