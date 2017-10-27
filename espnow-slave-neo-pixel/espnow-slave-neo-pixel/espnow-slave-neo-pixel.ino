@@ -95,7 +95,7 @@ void init_espnow() {
   });
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
-    led.toggle();
+//    led.toggle();
     Serial.printf("GOT data  = %u byte\r\n", len);
     _pixel_dirty = true;
     _pixel_no = data[0];

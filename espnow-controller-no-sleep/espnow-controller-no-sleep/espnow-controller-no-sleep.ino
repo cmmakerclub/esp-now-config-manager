@@ -73,11 +73,6 @@ int counter = 0;
 #include <CMMC_RX_Parser.h>
 CMMC_RX_Parser parser(&Serial);
 
-typedef struct __attribute((__packed__)) {
-  uint32_t time;
-} CMMC_SLEEP_TIME_T;
-
-
 void setup()
 {
   setup_hardware();
@@ -87,9 +82,10 @@ void setup()
   } CMMC_SERIAL_CMD_T;
   parser.on_command_arrived([](CMMC_SERIAL_PACKET_T * packet) {
     if (packet->cmd == 0x99) {
-      //      Serial.printf("lenn= %lu\r\n", packet->len);
-      Serial.write((uint8_t*) packet->data, packet->len);
-
+      led.toggle();
+      uint8_t target[6];
+      memcpy(target, packet->data, 6);
+      espNow.send(target, packet->data+6, packet->len-6);
     }
   });
 
@@ -125,8 +121,8 @@ void setup()
         wrapped.ms = millis();
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
-//        Serial.write((byte*)&wrapped, sizeof(wrapped));
-//        swSerial.write((byte*)&wrapped, sizeof(wrapped));
+        //        Serial.write((byte*)&wrapped, sizeof(wrapped));
+        //        swSerial.write((byte*)&wrapped, sizeof(wrapped));
       });
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
@@ -153,7 +149,7 @@ void loop()
     Serial.println("Simple Pair Wait timeout.");
     ESP.reset();
   }
-  
+
   parser.process();
   delay(1);
 
