@@ -9,6 +9,7 @@
 #include <CMMC_LED.h>
 #include <CMMC_BootMode.h>
 #include "data_type.h"
+u8 b = 5;
 
 #include <SoftwareSerial.h>
 #define rxPin 14
@@ -84,6 +85,13 @@ void setup()
   parser.on_command_arrived([](CMMC_SERIAL_PACKET_T * packet) {
     CMMC_SLEEP_TIME_T t;
     if (packet->cmd == CMMC_SLEEP_TIME_CMD) {
+      memcpy(&t.time, packet->data, 4);
+      b = t.time;
+
+      if (t.time > 255) {
+        b = 254;
+      }
+//      Serial.printf("
     }
   });
 
@@ -152,7 +160,7 @@ void loop()
   }
 
   while (dirty) {
-    //espNow.send(mmm, &b, 1);
+    espNow.send(mmm, &b, 1);
     delay(1);
   }
 

@@ -1,0 +1,28 @@
+#######################################
+# Syntax Coloring Map For BootMode
+#######################################
+
+#######################################
+# Datatypes (KEYWORD1)
+#######################################
+CMMC_BootMode		KEYWORD1
+BootMode				KEYWORD1
+
+#######################################
+# Methods and Functions (KEYWORD2)
+#######################################
+
+begin 					KEYWORD2
+check						KEYWORD2
+init						KEYWORD2
+
+#######################################
+# Instances (KEYWORD2)
+#######################################
+
+#######################################
+# Constants (LITERAL1)
+#######################################
+
+MODE_CONFIG		LITERAL1
+MODE_RUN			LITERAL1
