@@ -58,7 +58,6 @@ void evt_callback(u8 status, u8* sa, const u8* data) {
   }
 }
 
-
 void load_config() {
   configManager.load_config([](JsonObject * root) {
     Serial.println("[user] json loaded..");
@@ -81,7 +80,6 @@ void init_espnow() {
     led.toggle();
     Serial.println(millis());
     Serial.printf("sent status %lu\r\n", status);
-    //    goSleep(120);
   });
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {

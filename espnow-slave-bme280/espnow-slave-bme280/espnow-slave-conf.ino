@@ -13,7 +13,6 @@ uint8_t selective_button_pin = 13;
 uint32_t wait_button_pin_ms = 1;
 uint8_t master_mac[6];
 uint8_t self_mac[6];
-int dhtType = 22;
 int mode;
 
 
