@@ -41,7 +41,6 @@ uint8_t master_mac[6];
 uint8_t self_mac[6];
 int mode;
 
-
 #include "sp.h" 
 
 void init_espnow() {
@@ -103,13 +102,15 @@ void read_sensor() {
   packet.type = 1;
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
-  memcpy(packet.from, self_mac, 6);
+  memcpy(packet.from, self_mac, 6); 
   strcpy(packet.myName, "BME280-ID-02");
+  packet.nameLen = strlen(packet.myName);
 
   bool read_ok = 0;
   while(!read_ok) {
     float t = bme.readTemperature();
     float h = bme.readHumidity();
+    Serial.println(h);
 
     if (isnan(h) || h == 0) {
       Serial.println("read bme280 failed... try again..");
