@@ -5,19 +5,38 @@
 #include <Adafruit_BME280.h>
 
 #define LED_PIN 2
+#define PROD_MODE_PIN         13
+#define BUTTON_PIN             0
 #define DEFAULT_DEEP_SLEEP_S 60
 
-#include "head.h"
-#define SEALEVELPRESSURE_HPA (1013.25) 
-Adafruit_BME280 bme; // I2C
+#include <ArduinoJson.h>
+#include <ESP8266WiFi.h>
+#include <CMMC_Utils.h>
+#include <CMMC_SimplePair.h>
+#include <CMMC_Config_Manager.h>
+#include <CMMC_ESPNow.h>
+#include <CMMC_BootMode.h>
+#include <CMMC_LED.h>
+#include <CMMC_TimeOut.h>
+#include <DHT.h>
+#include "FS.h"
 
+#include "data_type.h"
+
+extern "C" {
+#include <espnow.h>
+#include <user_interface.h>
+}
+
+#define SEALEVELPRESSURE_HPA (1013.25) 
+
+Adafruit_BME280 bme; // I2C 
 CMMC_LED led(LED_PIN, HIGH); 
 CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
 
-uint8_t selective_button_pin = 13;
-uint32_t wait_button_pin_ms = 1;
+
 uint8_t master_mac[6];
 uint8_t self_mac[6];
 int mode;
@@ -50,21 +69,18 @@ void init_espnow() {
 void setup()
 {
   Serial.begin(57600);
+  Serial.println("starting...");
   led.init();
   Wire.begin();
   bme.begin(0x76);
-  float h = bme.readTemperature();
-  float t = bme.readHumidity();
-  delay(1000);
-  ESP.reset();
   configManager.init("/config98.json");
-  pinMode(5, INPUT_PULLUP);
-  pinMode(4, INPUT_PULLUP);
+  pinMode(PROD_MODE_PIN, INPUT_PULLUP); 
+  uint32_t wait_config = 1000;
+  if (digitalRead(PROD_MODE_PIN) == LOW) {
+    wait_config = 0; 
+  } 
 
-  selective_button_pin = digitalRead(5) ? 13 : 0;
-  wait_button_pin_ms = digitalRead(5) ?  1 : 2000;
-
-  CMMC_BootMode bootMode(&mode, selective_button_pin);
+  CMMC_BootMode bootMode(&mode, BUTTON_PIN);
 
   bootMode.init();
   bootMode.check([](int mode) {
@@ -78,23 +94,41 @@ void setup()
     else {
       // unhandled
     }
-  }, wait_button_pin_ms);
+  }, wait_config);
 }
 
 CMMC_SENSOR_T packet;
 
 void read_sensor() {
+  packet.type = 1;
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6);
-  //CMMC::printMacAddress(packet.from);
-  //CMMC::printMacAddress(packet.to);
+  strcpy(packet.myName, "BME280-ID-02");
+
+  bool read_ok = 0;
+  while(!read_ok) {
+    float t = bme.readTemperature();
+    float h = bme.readHumidity();
+
+    if (isnan(h) || h == 0) {
+      Serial.println("read bme280 failed... try again..");
+      delay(1000); 
+    }
+    else {
+      packet.field1 = t * 100;
+      packet.field2 = h * 100;
+      packet.field3 = bme.readPressure(); 
+      break;
+    }
+  }
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 
-  //  Serial.printf("%lu - %02x\r\n", packet.battery, packet.battery);
-  //  Serial.printf("%lu - %02x\r\n", packet.temperature, packet.temperature);
-  //  Serial.printf("%lu - %02x\r\n", packet.humidity, packet.humidity);
+   Serial.printf("battery     %lu(%02x)\r\n", packet.battery, packet.battery);
+   Serial.printf("temperature %lu(%02x)\r\n", packet.field1, packet.field1);
+   Serial.printf("humidity    %lu(%02x)\r\n", packet.field2, packet.field2);
+   Serial.printf("pressure    %lu(%02x)\r\n", packet.field3, packet.field3);
 }
 
 auto timeout_cb = []() {

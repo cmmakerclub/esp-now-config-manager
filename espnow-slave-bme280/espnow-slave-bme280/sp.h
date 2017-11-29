@@ -26,7 +26,7 @@ void init_simple_pair() {
   ct.timeout_ms(3000);
   while (1) {
     if (ct.is_timeout()) {
-      if (sp_flag_done && digitalRead(selective_button_pin) == LOW) {
+      if (sp_flag_done && digitalRead(BUTTON_PIN) == LOW) {
         ct.yield();
       }
       else {
