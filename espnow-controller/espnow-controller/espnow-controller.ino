@@ -20,9 +20,9 @@ bool dirty = false;
 
 SoftwareSerial swSerial(rxPin, txPin, false, 128);
 
-#define LED_PIN 2
-
-uint8_t selective_button_pin = 13;
+#define LED_PIN                 2
+#define BUTTON_PIN              0
+#define PROD_MODE_PIN         13
 
 int mode;
 
@@ -91,22 +91,19 @@ void setup()
       if (t.time > 255) {
         b = 254;
       }
-//      Serial.printf("
     }
   });
 
-  pinMode(5, INPUT_PULLUP);
-  pinMode(4, INPUT_PULLUP);
-
-  int selective_button_pin = 2;
-  int wait_button_pin_ms = 1;
-
-  selective_button_pin = digitalRead(5) ? 0 : 13;
-  wait_button_pin_ms = digitalRead(5) ?  2000 : 1;
-
-  CMMC_BootMode bootMode(&mode, selective_button_pin);
+  pinMode(PROD_MODE_PIN, INPUT_PULLUP); 
+  uint32_t wait_config = 1000;
+  if (digitalRead(PROD_MODE_PIN) == LOW) {
+    wait_config = 0; 
+  } 
+  Serial.printf("wait_config = %d \r\n", wait_config); 
+  CMMC_BootMode bootMode(&mode, BUTTON_PIN);
   bootMode.init();
   bootMode.check([](int mode) {
+    Serial.printf("done.... mode = %d \r\n", mode);
     if (mode == BootMode::MODE_CONFIG) {
       start_config_mode();
     }
@@ -138,7 +135,7 @@ void setup()
     else {
       // unhandled
     }
-  }, 300);
+  }, wait_config);
 }
 
 #include <CMMC_TimeOut.h>

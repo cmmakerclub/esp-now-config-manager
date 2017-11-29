@@ -1,13 +1,20 @@
 #define CMMC_USE_ALIAS
 #include <Arduino.h>
+#include <Wire.h>
+#include <SPI.h>
+#include <Adafruit_BME280.h>
 
 #define LED_PIN 2
-#define DHTPIN      12
 #define DEFAULT_DEEP_SLEEP_S 60
 
 #include "head.h"
+#define SEALEVELPRESSURE_HPA (1013.25) 
+Adafruit_BME280 bme; // I2C
 
-CMMC_LED led(LED_PIN, HIGH);
+CMMC_LED led(LED_PIN, HIGH); 
+CMMC_SimplePair simplePair;
+CMMC_Config_Manager configManager;
+CMMC_ESPNow espNow;
 
 uint8_t selective_button_pin = 13;
 uint32_t wait_button_pin_ms = 1;
@@ -44,16 +51,18 @@ void setup()
 {
   Serial.begin(57600);
   led.init();
+  Wire.begin();
+  bme.begin(0x76);
+  float h = bme.readTemperature();
+  float t = bme.readHumidity();
+  delay(1000);
+  ESP.reset();
   configManager.init("/config98.json");
   pinMode(5, INPUT_PULLUP);
   pinMode(4, INPUT_PULLUP);
 
   selective_button_pin = digitalRead(5) ? 13 : 0;
   wait_button_pin_ms = digitalRead(5) ?  1 : 2000;
-  dhtType = digitalRead(4) ? 22 : 11;
-
-  dht = new DHT(DHTPIN, dhtType);
-  dht->begin();
 
   CMMC_BootMode bootMode(&mode, selective_button_pin);
 
@@ -83,17 +92,6 @@ void read_sensor() {
   packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 
-  float h = dht->readHumidity();
-  float t = dht->readTemperature();
-  if (isnan(h) || isnan(t)) {
-    h = 0.0;
-    t = 0.0;
-  } else {
-    packet.temperature = t * 100;
-    packet.humidity = h * 100;
-  }
-
-  packet.ms = millis();
   //  Serial.printf("%lu - %02x\r\n", packet.battery, packet.battery);
   //  Serial.printf("%lu - %02x\r\n", packet.temperature, packet.temperature);
   //  Serial.printf("%lu - %02x\r\n", packet.humidity, packet.humidity);

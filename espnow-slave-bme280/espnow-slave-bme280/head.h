@@ -16,10 +16,3 @@ extern "C" {
 #include <espnow.h>
 #include <user_interface.h>
 }
-
-CMMC_SimplePair simplePair;
-CMMC_Config_Manager configManager;
-CMMC_ESPNow espNow;
-DHT *dht;
-
-int dhtType = 22;
