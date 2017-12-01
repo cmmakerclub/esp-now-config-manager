@@ -11,16 +11,17 @@ typedef struct __attribute((__packed__)) {
   uint32_t field4 = 0x00;
   uint32_t field5 = 0x00;
   uint32_t field6 = 0x00;
-  uint8_t nameLen;
-  char deviceName[15];
+  uint8_t nameLen = 0x00;
+  char myName[15]; 
   uint32_t ms = 0;
-  uint32_t sum;
-} CMMC_SENSOR_T;
+  uint32_t sent_ms = 0;
+  uint32_t sum = 0;
+} CMMC_SENSOR_T; 
 
 typedef struct __attribute((__packed__)) {
   uint8_t header[2] = {0x7e, 0x7f};
   uint8_t version = 1;
-  uint8_t project = 0;
+  uint8_t project = 1;
   uint8_t reserved[4];
   CMMC_SENSOR_T data;
   uint32_t sleepTime;

@@ -11,8 +11,9 @@ typedef struct __attribute((__packed__)) {
   uint32_t field4 = 0x00;
   uint32_t field5 = 0x00;
   uint32_t field6 = 0x00;
-  uint8_t nameLen;
-  char myName[15];
+  uint8_t nameLen = 0x00;
+  char myName[15]; 
   uint32_t ms = 0;
-  uint32_t sum;
+  uint32_t sent_ms = 0;
+  uint32_t sum = 0;
 } CMMC_SENSOR_T; 

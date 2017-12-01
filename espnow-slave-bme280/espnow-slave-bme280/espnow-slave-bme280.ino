@@ -103,8 +103,8 @@ void read_sensor() {
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6); 
-  strcpy(packet.myName, "BME280-ID-02");
-  packet.nameLen = strlen(packet.myName);
+  strcpy(packet.myName, "BME280-ID-01");
+  packet.nameLen = strlen(packet.myName); 
 
   bool read_ok = 0;
   while(!read_ok) {
@@ -117,6 +117,8 @@ void read_sensor() {
       delay(1000); 
     }
     else {
+      packet.ms = millis();
+      packet.sent_ms = millis();
       packet.field1 = t * 100;
       packet.field2 = h * 100;
       packet.field3 = bme.readPressure(); 

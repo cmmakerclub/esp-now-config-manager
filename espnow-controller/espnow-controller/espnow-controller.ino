@@ -73,9 +73,7 @@ int counter = 0;
 #include <CMMC_RX_Parser.h>
 CMMC_RX_Parser parser(&swSerial);
 
-typedef struct __attribute((__packed__)) {
-  uint32_t time;
-} CMMC_SLEEP_TIME_T;
+uint32_t time;
 
 
 void setup()
@@ -83,12 +81,11 @@ void setup()
   setup_hardware();
   Serial.println("Controller Mode");
   parser.on_command_arrived([](CMMC_SERIAL_PACKET_T * packet) {
-    CMMC_SLEEP_TIME_T t;
     if (packet->cmd == CMMC_SLEEP_TIME_CMD) {
-      memcpy(&t.time, packet->data, 4);
-      b = t.time;
+      memcpy(&time, packet->data, 4);
+      b = time;
 
-      if (t.time > 255) {
+      if (time > 255) {
         b = 254;
       }
     }
@@ -121,6 +118,7 @@ void setup()
         memcpy(&packet, data, sizeof(packet));
         wrapped.data = packet;
         wrapped.ms = millis();
+        wrapped.sleepTime = b;
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
         Serial.write((byte*)&wrapped, sizeof(wrapped));
