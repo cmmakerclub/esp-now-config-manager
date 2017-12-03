@@ -23,9 +23,9 @@ typedef struct __attribute((__packed__)) {
   uint8_t version = 1;
   uint8_t project = 1;
   uint8_t reserved[4];
-  CMMC_SENSOR_T data;
   uint32_t sleepTime;
   uint32_t ms;
+  CMMC_SENSOR_T data;
   uint32_t sum;
   uint8_t tail[2] = {0x0d, 0x0a};
 } CMMC_PACKET_T; 

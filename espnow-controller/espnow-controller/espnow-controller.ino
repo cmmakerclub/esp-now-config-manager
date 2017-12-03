@@ -9,8 +9,8 @@
 #include <CMMC_LED.h>
 #include <CMMC_BootMode.h>
 #include "data_type.h"
-u8 b = 5;
 
+u8 b = 60; 
 #include <SoftwareSerial.h>
 #define rxPin 14
 #define txPin 12
@@ -30,7 +30,6 @@ CMMC_SimplePair instance;
 CMMC_ESPNow espNow;
 CMMC_Utils utils;
 CMMC_LED led(LED_PIN, LOW);
-
 
 uint8_t mmm[6];
 
@@ -121,8 +120,9 @@ void setup()
         wrapped.sleepTime = b;
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
+        // Serial.printf("sizeof wrapped = %d\r\n", sizeof(wrapped));
         Serial.write((byte*)&wrapped, sizeof(wrapped));
-        swSerial.write((byte*)&wrapped, sizeof(wrapped));
+        swSerial.write((byte*)&wrapped, sizeof(wrapped)); 
       });
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {

@@ -147,9 +147,9 @@ void CMMC_SimplePair::_simple_pair_init() {
               }
               break;
             }
-            // bss_link = bss_link->next->stqe_next;
             _this->debug_cb("next...");
-            bss_link = bss_link->next;
+            // bss_link = (struct bss_info*)bss_link->next;
+            // bss_link = bss_link->next->stqe_next;
           }
         } else {
           sprintf(_this->_debug_buffer, "err, scan status %d", status);
