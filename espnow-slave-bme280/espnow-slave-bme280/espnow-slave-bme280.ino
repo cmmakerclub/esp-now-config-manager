@@ -28,6 +28,7 @@ extern "C" {
 #include <user_interface.h>
 }
 
+String myName = String("LATTE-ID-01");
 #define SEALEVELPRESSURE_HPA (1013.25)
 
 Adafruit_BME280 bme; // I2C
@@ -103,7 +104,7 @@ void read_sensor() {
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
   memcpy(packet.from, self_mac, 6);
-  strcpy(packet.myName, "LATTE-ID-02");
+  strcpy(packet.myName, myName.c_str());
   packet.nameLen = strlen(packet.myName);
 
   bool read_ok = 0;
@@ -124,7 +125,6 @@ void read_sensor() {
     }
   }
     packet.ms = millis();
-    packet.sent_ms = millis();
     packet.sum = CMMC::checksum((uint8_t*) &packet,
                               sizeof(packet) - sizeof(packet.sum));
 
@@ -138,8 +138,11 @@ void loop()
 {
   Serial.printf("millis() = %lu\r\n", millis());
   read_sensor();
-  packet.sent_ms = millis();
-  packet.sent_ms = millis();
+  packet.sent_ms = millis() - packet.ms;
+  packet.sum = CMMC::checksum((uint8_t*) &packet,
+                              sizeof(packet) - sizeof(packet.sum));
+   CMMC::dump((u8*)&packet, sizeof(packet));
+   Serial.printf("sum %lu(%02x)\r\n", packet.sum, packet.sum);
   if (master_mac[0] == 0x00 && master_mac[1] == 0x00) {
     goSleep(DEFAULT_DEEP_SLEEP_S);
   }

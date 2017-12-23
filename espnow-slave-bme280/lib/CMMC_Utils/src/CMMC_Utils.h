@@ -75,7 +75,7 @@ public:
       }
       return sum;
     }
-    static uint32_t unless(uint8_t state, uint32_t a, uint32_t b) { 
+    static uint32_t unless(uint8_t state, uint32_t a, uint32_t b) {
       if (state == LOW) {
         return a;
       }
