@@ -7,7 +7,7 @@
 #define LED_PIN 2
 #define PROD_MODE_PIN         13
 #define BUTTON_PIN             0
-#define DEFAULT_DEEP_SLEEP_S 10
+#define DEFAULT_DEEP_SLEEP_S  30
 
 #include <ArduinoJson.h>
 #include <ESP8266WiFi.h>
@@ -28,10 +28,10 @@ extern "C" {
 #include <user_interface.h>
 }
 
-#define SEALEVELPRESSURE_HPA (1013.25) 
+#define SEALEVELPRESSURE_HPA (1013.25)
 
-Adafruit_BME280 bme; // I2C 
-CMMC_LED led(LED_PIN, HIGH); 
+Adafruit_BME280 bme; // I2C
+CMMC_LED led(LED_PIN, HIGH);
 CMMC_SimplePair simplePair;
 CMMC_Config_Manager configManager;
 CMMC_ESPNow espNow;
@@ -41,7 +41,7 @@ uint8_t master_mac[6];
 uint8_t self_mac[6];
 int mode;
 
-#include "sp.h" 
+#include "sp.h"
 
 void init_espnow() {
   uint8_t* slave_addr = CMMC::getESPNowSlaveMacAddress();
@@ -53,17 +53,17 @@ void init_espnow() {
     led.toggle();
     Serial.println(millis());
     Serial.printf("sent status %lu\r\n", status);
-       goSleep(120);
+       goSleep(DEFAULT_DEEP_SLEEP_S);
   });
 
   espNow.on_message_recv([](uint8_t * macaddr, uint8_t * data, uint8_t len) {
     led.toggle();
     Serial.printf("GOT sleepTime = %lu\r\n", data[0]);
-    if (data[0] == 0) 
+    if (data[0] == 0)
       data[0] = 30;
     goSleep(data[0]);
   });
-} 
+}
 
 void setup()
 {
@@ -73,11 +73,11 @@ void setup()
   Wire.begin();
   bme.begin(0x77);
   configManager.init("/config98.json");
-  pinMode(PROD_MODE_PIN, INPUT_PULLUP); 
+  pinMode(PROD_MODE_PIN, INPUT_PULLUP);
   uint32_t wait_config = 1000;
   if (digitalRead(PROD_MODE_PIN) == LOW) {
-    wait_config = 0; 
-  } 
+    wait_config = 0;
+  }
 
   CMMC_BootMode bootMode(&mode, BUTTON_PIN);
 
@@ -102,9 +102,9 @@ void read_sensor() {
   packet.type = 8;
   packet.battery = analogRead(A0);
   memcpy(packet.to, master_mac, 6);
-  memcpy(packet.from, self_mac, 6); 
-  strcpy(packet.myName, "LATTE-ID-01");
-  packet.nameLen = strlen(packet.myName); 
+  memcpy(packet.from, self_mac, 6);
+  strcpy(packet.myName, "LATTE-ID-02");
+  packet.nameLen = strlen(packet.myName);
 
   bool read_ok = 0;
   while(!read_ok) {
@@ -114,12 +114,12 @@ void read_sensor() {
 
     if (isnan(h) || h == 0) {
       Serial.println("read bme280 failed... try again..");
-      delay(1000); 
+      delay(1000);
     }
     else {
       packet.field1 = t * 100;
       packet.field2 = h * 100;
-      packet.field3 = bme.readPressure(); 
+      packet.field3 = bme.readPressure();
       break;
     }
   }
@@ -137,7 +137,7 @@ void read_sensor() {
 void loop()
 {
   Serial.printf("millis() = %lu\r\n", millis());
-  read_sensor(); 
+  read_sensor();
   packet.sent_ms = millis();
   packet.sent_ms = millis();
   if (master_mac[0] == 0x00 && master_mac[1] == 0x00) {
@@ -147,8 +147,8 @@ void loop()
     espNow.enable_retries(true);
     Serial.println(millis());
     espNow.send(master_mac, (u8*)&packet, sizeof (packet), []() { }, 1000);
-  } 
-  delay(10); 
+  }
+  delay(10);
 }
 
 void goSleep(uint32_t deepSleepS) {

@@ -1,6 +1,5 @@
 #define CMMC_USE_ALIAS
 
-
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <CMMC_SimplePair.h>
@@ -18,7 +17,8 @@ u8 b = 60;
 bool serialBusy = false;
 bool dirty = false;
 
-SoftwareSerial swSerial(rxPin, txPin, false, 128);
+// SoftwareSerial swSerial(rxPin, txPin, false, 128);
+SoftwareSerial swSerial(rxPin, txPin);
 
 #define LED_PIN                 2
 #define BUTTON_PIN              0
@@ -120,9 +120,10 @@ void setup()
         wrapped.sleepTime = b;
         wrapped.sum = CMMC::checksum((uint8_t*) &wrapped,
                                      sizeof(wrapped) - sizeof(wrapped.sum));
-        // Serial.printf("sizeof wrapped = %d\r\n", sizeof(wrapped));
+        Serial.printf("sizeof wrapped = %d\r\n", sizeof(wrapped));
         Serial.write((byte*)&wrapped, sizeof(wrapped));
-        swSerial.write((byte*)&wrapped, sizeof(wrapped)); 
+        CMMC_Utils::dump((u8*)&wrapped, sizeof(wrapped));
+        Serial.println(swSerial.write((byte*)&wrapped, sizeof(wrapped)));
       });
 
       espNow.on_message_sent([](uint8_t *macaddr,  uint8_t status) {
